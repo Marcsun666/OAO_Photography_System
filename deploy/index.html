@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OAO 摄影社 | 社团活动记录站</title>
+    <meta name="description" content="OAO 摄影社 · 社团活动记录站：记录社团活动、整理照片视频、沉淀每一次校园现场。" />
+    <meta property="og:title" content="OAO 摄影社 | 社团活动记录站" />
+    <meta property="og:description" content="记录社团活动、整理照片视频、沉淀每一次校园现场。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/brand/recruitment-banner-2026-og.jpg" />
+    <link rel="icon" href="assets/brand/OAO.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css" />
+    <!-- 首屏大图（.hero 背景）提前下载，缩短首屏出图时间 -->
+    <link rel="preload" as="image" href="assets/events/stage-group-photo.webp" type="image/webp" />
+  </head>
+  <body>
+    <a class="skip-link" href="#top">跳到主要内容</a>
+    <header class="site-header" aria-label="主导航">
+      <nav class="nav-links" id="site-nav" aria-label="页面导航">
+        <a href="#record">记录</a>
+        <a href="#request">申请</a>
+        <a href="#library">素材</a>
+        <a href="#works">作品</a>
+        <a href="#members">成员</a>
+        <a href="#bilibili">B站</a>
+      </nav>
+      <div class="member-zone">
+        <button class="member-toggle" id="member-toggle" type="button">成员登录</button>
+        <button class="member-toggle" id="upload-entry" type="button" hidden>＋ 上传 / 贴链接</button>
+      </div>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="打开菜单" aria-controls="site-nav" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <!-- Liquid Glass 折射滤镜：位移贴图由 script.js 按浮岛实际尺寸生成。
+         feDisplacementMap 用贴图的 R 通道控横向位移、G 通道控纵向，128 为中性。
+         注：backdrop-filter 引用 SVG 滤镜目前只有 Chromium 支持，
+         其他浏览器由 @supports 回落到纯模糊版本。 -->
+    <svg class="glass-defs" aria-hidden="true" focusable="false" width="0" height="0">
+      <filter id="liquid-glass" color-interpolation-filters="sRGB"
+              x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
+        <!-- 位移贴图：R=横向位移 G=纵向位移，128 为中性 -->
+        <feImage id="glass-map" result="map" preserveAspectRatio="none" />
+        <!-- 边缘高光图：白色，alpha 跟着法线走 -->
+        <feImage id="glass-rim" result="rim" preserveAspectRatio="none" />
+
+        <!-- 色散：同一张贴图跑三次位移，红偏多、绿基准、蓝偏少，
+             再各取一个通道相加。等价于 shader 里逐通道错位采样：
+               rC = tex(baseUV + offsetUV * d)
+               gC = tex(baseUV)
+               bC = tex(baseUV - offsetUV * d)  -->
+        <feDisplacementMap id="glass-disp-r" in="SourceGraphic" in2="map"
+                           scale="0" xChannelSelector="R" yChannelSelector="G" result="dR" />
+        <feDisplacementMap id="glass-disp-g" in="SourceGraphic" in2="map"
+                           scale="0" xChannelSelector="R" yChannelSelector="G" result="dG" />
+        <feDisplacementMap id="glass-disp-b" in="SourceGraphic" in2="map"
+                           scale="0" xChannelSelector="R" yChannelSelector="G" result="dB" />
+        <feColorMatrix in="dR" type="matrix" result="oR"
+          values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" />
+        <feColorMatrix in="dG" type="matrix" result="oG"
+          values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" />
+        <feColorMatrix in="dB" type="matrix" result="oB"
+          values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" />
+        <feComposite in="oR" in2="oG" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="oRG" />
+        <feComposite in="oRG" in2="oB" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="disp" />
+
+        <feGaussianBlur in="disp" stdDeviation="0.8" result="soft" />
+        <feComponentTransfer in="soft" result="lit">
+          <feFuncR type="linear" slope="1.06" intercept="0.045" />
+          <feFuncG type="linear" slope="1.06" intercept="0.045" />
+          <feFuncB type="linear" slope="1.06" intercept="0.045" />
+        </feComponentTransfer>
+
+        <!-- 边缘高光叠在最上层，screen 只提亮不盖死 -->
+        <feBlend in="lit" in2="rim" mode="screen" />
+      </filter>
+    </svg>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-content">
+          <h1 id="hero-title">给同学们记录社团活动、整理照片视频、沉淀每一次校园现场。</h1>
+        </div>
+      </section>
+
+      <section class="stat-band" aria-label="社团亮点">
+        <aside class="hero-rail" id="stat-rail">
+          <div>
+            <strong>40</strong>
+            <span>场校内外拍摄</span>
+          </div>
+          <div>
+            <strong>1TB+</strong>
+            <span>年度素材沉淀</span>
+          </div>
+          <div>
+            <strong>2</strong>
+            <span>照片组 / 视频组</span>
+          </div>
+          <div>
+            <strong>26-27</strong>
+            <span>招新进行中</span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="record-hub" id="record" aria-labelledby="record-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Start Logging</p>
+            <h2 id="record-title">选择记录方式</h2>
+          </div>
+        </div>
+        <div class="record-layout">
+          <a class="record-card photo-card" href="#works">
+            <span>Photo Unit</span>
+            <h3>照片组</h3>
+            <p>上传活动现场、合照、舞台、运动会和社团联动素材，形成可浏览的照片合集。</p>
+          </a>
+          <a class="record-card video-card" href="#bilibili">
+            <span>Video Unit</span>
+            <h3>视频组</h3>
+            <p>整理活动片段、采访、幕后记录和成片发布入口，后续可以接入 B 站或视频库。</p>
+          </a>
+          <aside class="platform-card" id="bilibili-link">
+            <p class="eyebrow">Bilibili</p>
+            <h3>OAO 摄影社 B 站</h3>
+            <p>这里先预留账号链接位置，之后可以替换成正式主页或作品合集。</p>
+            <a class="button ghost" href="#" aria-label="B站账号链接占位">B站账号链接占位</a>
+          </aside>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace" aria-labelledby="workspace-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Workspace</p>
+            <h2 id="workspace-title">照片 / 视频工作台</h2>
+          </div>
+        </div>
+        <div class="board-grid">
+          <article class="board-panel">
+            <div class="board-head">
+              <p class="panel-label">Photo Unit</p>
+              <strong>照片组</strong>
+            </div>
+            <ul class="status-list" id="board-photo-list">
+              <li><span>待选片</span><strong>126</strong></li>
+              <li><span>精修中</span><strong>48</strong></li>
+              <li><span>待交付</span><strong>7</strong></li>
+              <li><span>已归档</span><strong>18</strong></li>
+            </ul>
+          </article>
+          <article class="board-panel">
+            <div class="board-head">
+              <p class="panel-label">Video Unit</p>
+              <strong>视频组</strong>
+            </div>
+            <ul class="status-list" id="board-video-list">
+              <li><span>待剪辑</span><strong>9</strong></li>
+              <li><span>调色中</span><strong>4</strong></li>
+              <li><span>待发布</span><strong>3</strong></li>
+              <li><span>已发布</span><strong>12</strong></li>
+            </ul>
+          </article>
+          <article class="board-panel highlight" id="board-week">
+            <p class="panel-label">This week</p>
+            <h3>本周记录任务</h3>
+            <p>排球社合照、运动会精选返图、志愿者日素材归档、舞台视频封面整理。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="request-section strip" id="request" aria-labelledby="request-title">
+        <div class="request-copy">
+          <p class="eyebrow">Request</p>
+          <h2 id="request-title">申请 OAO 拍摄活动</h2>
+          <p>给其他社团或活动负责人使用的入口。这里先做成本地 UI，之后可以接问卷、飞书表格或社团内部系统。</p>
+        </div>
+        <form class="request-form" id="request-form">
+          <label>
+            <span>活动名称</span>
+            <input name="event" type="text" placeholder="例如：音乐剧社公演 / 运动会决赛" required />
+          </label>
+          <label>
+            <span>活动时间</span>
+            <input name="date" type="text" placeholder="例如：2026.09.12 15:30" required />
+          </label>
+          <fieldset class="cas-field">
+            <legend>CAS 时长（小时，可留空）</legend>
+            <div class="cas-grid" aria-label="CAS 时间记录">
+              <label>
+                <span>C</span>
+                <input name="creativity" type="number" min="0" step="0.5" placeholder="0" inputmode="decimal" />
+              </label>
+              <label>
+                <span>A</span>
+                <input name="activity" type="number" min="0" step="0.5" placeholder="0" inputmode="decimal" />
+              </label>
+              <label>
+                <span>S</span>
+                <input name="service" type="number" min="0" step="0.5" placeholder="0" inputmode="decimal" />
+              </label>
+            </div>
+          </fieldset>
+          <label>
+            <span>活动描述或活动记录</span>
+            <textarea name="record" placeholder="记录活动内容、拍摄重点、参与感受或后续整理事项" required></textarea>
+          </label>
+          <button class="button primary" type="submit">提交活动记录</button>
+          <p class="request-status" id="request-status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="timeline-section" id="timeline" aria-labelledby="timeline-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Timeline</p>
+            <h2 id="timeline-title">活动记录时间线</h2>
+          </div>
+        </div>
+        <div class="timeline-list" id="timeline-list">
+          <article>
+            <time>2026.06</time>
+            <h3>排球社合照</h3>
+            <p>红墙合照、团队肖像、社团宣传素材。</p>
+            <span>已归档</span>
+          </article>
+          <article>
+            <time>2026.04</time>
+            <h3>汽车社上汽活动</h3>
+            <p>活动现场、实验细节、社团联动记录。</p>
+            <span>精选中</span>
+          </article>
+          <article>
+            <time>2025.12</time>
+            <h3>志愿者日</h3>
+            <p>活动跟拍、现场特写、校园公益记录。</p>
+            <span>已交付</span>
+          </article>
+          <article>
+            <time>2025.11</time>
+            <h3>校运动会</h3>
+            <p>比赛瞬间、班级合影、赛场视频素材。</p>
+            <span>视频待发布</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="library-section strip" id="library" aria-labelledby="library-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Archive</p>
+            <h2 id="library-title">活动素材库</h2>
+          </div>
+        </div>
+        <div class="archive-grid" id="archive-grid">
+          <div class="empty-state">素材库为空，接入素材后自动展示。</div>
+        </div>
+      </section>
+
+      <section class="video-section" id="bilibili" aria-labelledby="video-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Bilibili</p>
+            <h2 id="video-title">B 站视频作品区</h2>
+          </div>
+          <a class="button ghost" href="#" aria-label="OAO B站主页链接占位">B站主页占位</a>
+        </div>
+        <div class="video-grid" id="video-grid">
+          <div class="empty-state">还没有 B 站 / 小红书链接，稍后补充。</div>
+        </div>
+      </section>
+
+      <section class="works" id="works" aria-labelledby="works-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Photo Collection</p>
+            <h2 id="works-title">照片合集</h2>
+          </div>
+        </div>
+
+        <div class="gallery-grid" id="gallery-grid">
+          <div class="empty-state">照片合集为空，上传照片后自动展示。</div>
+        </div>
+      </section>
+
+      <section class="members-section" id="members" aria-labelledby="members-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Roster</p>
+            <h2 id="members-title">成员资料与技能</h2>
+            <p class="section-lede">
+              填一次，之后排班和分组都用得上。技能标签可以直接拖进下面的方框，
+              也可以点一下加入——手机上点选更顺手。
+            </p>
+          </div>
+        </div>
+
+        <div class="members-layout">
+          <form class="member-form" id="member-form">
+            <div class="member-grid">
+              <label>
+                <span>姓名</span>
+                <input name="name" type="text" placeholder="你的名字" required />
+              </label>
+              <label>
+                <span>班级</span>
+                <input name="klass" type="text" placeholder="例如：G11-3" required />
+              </label>
+              <label>
+                <span>学号</span>
+                <input name="studentId" type="text" placeholder="例如：20260117" required />
+              </label>
+              <label>
+                <span>性别</span>
+                <select name="gender">
+                  <option value="">不填</option>
+                  <option>男</option>
+                  <option>女</option>
+                  <option>无性别</option>
+                </select>
+              </label>
+              <label class="member-grid-wide">
+                <span>社内职位</span>
+                <input name="role" type="text" placeholder="例如：照片组组长 / 干事 / 社员" />
+              </label>
+            </div>
+
+            <div class="skill-picker">
+              <p class="panel-label">我掌握的技能</p>
+              <div class="skill-drop" id="skill-selected" data-zone="selected" aria-label="我的技能，可拖入或点选">
+                <p class="skill-hint" id="skill-hint">把下面的技能拖进来，或者直接点一下</p>
+              </div>
+
+              <p class="panel-label skill-pool-label">可选技能</p>
+              <div class="skill-drop skill-pool" id="skill-pool" data-zone="pool" aria-label="可选技能"></div>
+              <input type="hidden" name="skills" id="member-skills" />
+            </div>
+
+            <label>
+              <span>补充说明（可留空）</span>
+              <textarea name="note" rows="3" placeholder="擅长的设备、想练的方向、不方便的时间段……"></textarea>
+            </label>
+
+            <button class="button primary" type="submit">保存我的资料</button>
+            <p class="member-status" id="member-status" aria-live="polite"></p>
+          </form>
+
+          <aside class="member-roster">
+            <p class="panel-label">已登记成员</p>
+            <div class="roster-list" id="roster-list"></div>
+
+            <div class="group-tool" id="group-tool">
+              <p class="panel-label">AI 自动分组</p>
+              <p class="group-lede">按技能互补自动分组，结果可以人工改。</p>
+              <div class="group-controls">
+                <label>
+                  <span>分几组</span>
+                  <input id="group-count" type="number" min="2" max="20" step="1" value="3" />
+                </label>
+                <button class="button ghost" id="group-run" type="button">开始分组</button>
+              </div>
+              <p class="group-status" id="group-status" aria-live="polite"></p>
+              <div class="group-result" id="group-result"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="teams strip" id="teams" aria-labelledby="teams-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Inside Us</p>
+            <h2 id="teams-title">两个组别，两种影像路径</h2>
+          </div>
+        </div>
+        <div class="team-layout">
+          <article class="team-panel">
+            <p class="panel-label">Photo Unit</p>
+            <h3>照片组</h3>
+            <p>学习现场观察、构图、曝光、后期和交付流程，在真实活动里持续练手。</p>
+            <ul>
+              <li>学生会 / 社团活动记录</li>
+              <li>运动会、歌手大赛、教师节拍摄</li>
+              <li>社团联动与风采集拍摄</li>
+            </ul>
+          </article>
+          <article class="team-panel accent">
+            <p class="panel-label">Documentary Unit</p>
+            <h3>视频组</h3>
+            <p>从“拍到”走向“讲清楚”：策划、分镜、拍摄、素材管理、剪辑协作。</p>
+            <ul>
+              <li>校园活动总结片</li>
+              <li>访谈录制与纪录片项目</li>
+              <li>电影级调色和后期工作流</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="events" id="events" aria-labelledby="events-title">
+        <div class="section-copy">
+          <p class="eyebrow">Calendar Feel</p>
+          <h2 id="events-title">你会参与的现场</h2>
+        </div>
+        <div class="event-track" aria-label="活动列表">
+          <article>
+            <time>社团课</time>
+            <h3>手机街拍摄影</h3>
+            <p>从观察、光线、瞬间开始，把手机变成练习构图的日常工具。</p>
+          </article>
+          <article>
+            <time>社团课</time>
+            <h3>相机风光摄影</h3>
+            <p>理解镜头、参数和景别，在户外或校园里完成一组完整作品。</p>
+          </article>
+          <article>
+            <time>后期</time>
+            <h3>视频电影级调色</h3>
+            <p>熟悉色彩情绪、素材整理和协同剪辑，让影像拥有统一表达。</p>
+          </article>
+          <article>
+            <time>联动</time>
+            <h3>戏剧社 / 音乐剧社 / 管弦乐团</h3>
+            <p>长期合作拍摄舞台排练、正式演出与幕后故事。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="join strip" id="join" aria-labelledby="join-title">
+        <div class="join-copy">
+          <p class="eyebrow">Join Us</p>
+          <h2 id="join-title">想拍照片、拍视频，或者只是想认真看世界，都可以来。</h2>
+          <p>
+            这只是本地 UI，表单会在浏览器里模拟提交。后续可以接入问卷、飞书、多维表格或学校系统。
+          </p>
+        </div>
+        <form class="join-form" id="join-form">
+          <label>
+            <span>姓名</span>
+            <input name="name" type="text" placeholder="你的名字" required />
+          </label>
+          <label>
+            <span>感兴趣的方向</span>
+            <select name="track" required>
+              <option value="">请选择</option>
+              <option>照片组</option>
+              <option>视频组</option>
+              <option>两个都想试试</option>
+            </select>
+          </label>
+          <label>
+            <span>想拍什么</span>
+            <textarea name="note" rows="4" placeholder="活动、舞台、运动、街拍、风光……"></textarea>
+          </label>
+          <button class="button primary" type="submit">提交试试看</button>
+          <p class="form-status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <footer class="site-footer" aria-label="页脚">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <strong>OAO 摄影社</strong>
+          <span>Photo · Documentary · Campus</span>
+        </div>
+        <nav class="footer-links" aria-label="页脚导航">
+          <a href="#record">记录</a>
+          <a href="#request">申请</a>
+          <a href="#library">素材</a>
+          <a href="#works">作品</a>
+          <a href="#bilibili">B站</a>
+          <a href="#join">加入我们</a>
+        </nav>
+        <div class="footer-social">
+          <a href="#" aria-label="B站主页（占位）">B站</a>
+          <a href="#" aria-label="小红书主页（占位）">小红书</a>
+        </div>
+      </div>
+      <p class="footer-copy">© 2026 OAO 摄影社 · 用影像记录校园现场</p>
+    </footer>
+
+    <!-- 成员登录弹窗 -->
+    <div class="modal" id="login-modal" aria-hidden="true">
+      <div class="modal-card">
+        <button class="modal-close" type="button" aria-label="关闭">×</button>
+        <p class="eyebrow">Member Access</p>
+        <h3>社团成员登录</h3>
+        <p class="modal-note">输入社团访问口令，解锁上传、贴网盘链接和活动记录管理。</p>
+        <form id="login-form">
+          <label>
+            <span>访问口令</span>
+            <input name="passcode" type="password" placeholder="访问口令" required autocomplete="current-password" />
+          </label>
+          <button class="button primary" type="submit">登录</button>
+          <p class="modal-status" id="login-status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- 上传 / 贴链接弹窗 -->
+    <div class="modal" id="upload-modal" aria-hidden="true">
+      <div class="modal-card modal-card--wide">
+        <button class="modal-close" type="button" aria-label="关闭">×</button>
+        <p class="eyebrow">Upload / Link</p>
+        <h3>上传照片 · 贴网盘链接</h3>
+        <form id="upload-form">
+          <label>
+            <span>所属活动（选择或新建）</span>
+            <input name="activity" list="activity-list" placeholder="例如：排球社合照" required />
+            <datalist id="activity-list"></datalist>
+          </label>
+          <fieldset class="mode-tabs">
+            <legend>入库方式</legend>
+            <label><input type="radio" name="mode" value="link" checked /> 贴网盘链接</label>
+            <label><input type="radio" name="mode" value="file" /> 直接上传照片</label>
+          </fieldset>
+          <div class="mode-panel mode-link">
+            <label>
+              <span>百度网盘分享链接</span>
+              <input name="link" type="url" placeholder="https://pan.baidu.com/s/..." />
+            </label>
+            <label>
+              <span>提取码（可选）</span>
+              <input name="code" type="text" placeholder="提取码" />
+            </label>
+          </div>
+          <div class="mode-panel mode-file" hidden>
+            <label>
+              <span>选择照片</span>
+              <input name="file" type="file" accept="image/*" />
+            </label>
+            <label>
+              <span>分类</span>
+              <select name="category">
+                <option>campus</option>
+                <option>sports</option>
+                <option>stage</option>
+                <option>collab</option>
+                <option>landscape</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            <span>说明（可选）</span>
+            <textarea name="note" rows="2" placeholder="这张/这组素材的一句话说明"></textarea>
+          </label>
+          <button class="button primary" type="submit">提交入库</button>
+          <p class="modal-status" id="upload-status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" aria-live="polite"></div>
+
+    <div class="lightbox" id="lightbox" aria-hidden="true">
+      <button class="lightbox-close" type="button" aria-label="关闭预览">×</button>
+      <button class="lightbox-nav lightbox-prev" type="button" aria-label="上一张">‹</button>
+      <button class="lightbox-nav lightbox-next" type="button" aria-label="下一张">›</button>
+      <img src="" alt="" />
+      <p class="lightbox-caption"></p>
+      <p class="lightbox-counter"></p>
+    </div>
+
+    <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+    <button class="back-to-top" id="back-to-top" type="button" aria-label="回到顶部">↑</button>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

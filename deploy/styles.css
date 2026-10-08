@@ -1,0 +1,3471 @@
+/* ==================================================================
+ * OAO 摄影社 · styles.css
+ *
+ * 结构：① 底层基础样式（文件前半）
+ *       ② 「Apple 结构 + Sequoia 配色」覆盖层（下方大标题处起，
+ *          含表单、材质分级、尺度系统、squircle、动效、导航、Liquid Glass 等分节）
+ * 设计令牌（颜色 / 字体 / 圆角 / 控件尺度）只在下面这一个 :root 里。
+ *
+ * 2026-10-08 清理（渲染结果不变，已逐元素比对 computed style + 截图）：
+ *   - 删除被后面同选择器 / 同媒体条件完全覆盖的声明（约 700 条）；
+ *   - 删除页面和 JS 里都不存在的 class 的选择器（.kicker 保留，README 列为常用组件）；
+ *   - 删除没人引用的 CSS 变量和 @keyframes materialize；
+ *   - 三个 :root 合并成一个；Web 字体换成系统字体栈（PingFang 优先）。
+ * ================================================================== */
+
+:root {
+  color-scheme: light;
+  /* 配色令牌：白底、纯黑文字、Apple 次要灰 #6e6e73（白底 5.07:1、灰块上 4.66:1）。
+     交互色是中性近黑 #1d1d1f —— 照片主色跨红/橙/蓝，固定色相会和作品打架，
+     所以颜色全部留给作品。Sequoia 绿 #007354 只出现在登录页（functions/_middleware.js）。 */
+  --bg: #ffffff;
+  --surface: #f5f5f7;
+  --surface-2: #f5f5f7;
+  --border: #d2d2d7;
+  --text: #000000;
+  --text-muted: #6e6e73;
+  --accent: #1d1d1f;
+  --accent-strong: #1d1d1f;
+  --shadow: rgba(0, 0, 0, 0.08);
+  /* 兼容旧变量名（沿用现有 var() 引用） */
+  --ink: var(--text);
+  --muted: var(--text-muted);
+  --line: var(--border);
+  --amber: var(--accent);
+  --cyan: var(--text-muted);
+  --rose: var(--text-muted);
+  /* 字体：只用系统字体，不加载任何 Web 字体（Google Fonts 在国内打不开）。
+       苹果设备：拉丁 → SF Pro（-apple-system），中文 → PingFang SC
+       Windows → 微软雅黑；Android / Linux → Noto Sans SC；其余回落 Helvetica Neue / Arial
+     PingFang、SF Pro 都是苹果系统字体，授权不允许自托管，只能这样按名字调用。 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
+  /* 版式宽度与 Apple 风格圆角 */
+  --radius-pill: 980px;   /* Apple 的胶囊按钮 */
+  --radius-card: 18px;    /* Apple 的卡片圆角 */
+  --w-content: 980px;     /* Apple 的正文栏宽 */
+  --w-wide: 1240px;
+  /* 连续曲率的角在同一数值下比圆弧「读起来更紧」，所以整体加大约 1.3×，
+     视觉上才和原来的圆润度相当（甚至更圆）。 */
+  --r-3: 16px;   /* 44px：标准控件、输入框 */
+  --r-4: 22px;   /* ~120px：列表行、文本域 */
+  --r-5: 30px;   /* 250–500px：卡片 */
+  --r-6: 40px;   /* 大面板、弹窗、图块 */
+  --r-pill: 999px;
+  /* 控件尺度：高 44 / 字 17，是「刚好一行字 + 上下呼吸」的比例 */
+  --ctl-h: 44px;
+  --ctl-pad-x: 16px;
+  --ctl-fs: 17px;
+  font-family: var(--font-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: #1b1917;
+}
+
+img {
+  display: block;
+  width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-header {
+  z-index: 20;
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.nav-links a {
+  border-radius: 8px;
+  transition: color 160ms ease;
+}
+
+.hero {
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  gap: 48px;
+  isolation: isolate;
+}
+
+.hero::before,
+.hero::after {
+  position: absolute;
+  pointer-events: none;
+  content: "";
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.08)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.32), transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.54), 0 26px 90px rgba(31, 44, 68, 0.08);
+  backdrop-filter: blur(18px) saturate(1.25);
+  transform: skewX(-12deg);
+}
+
+.hero::before {
+  width: min(52vw, 720px);
+  height: 42vh;
+  right: -10vw;
+  top: 96px;
+}
+
+.hero::after {
+  width: min(46vw, 620px);
+  height: 28vh;
+  left: -18vw;
+  bottom: 42px;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  border-radius: 8px;
+}
+
+.kicker,
+.eyebrow,
+.panel-label {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+.button {
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.95);
+}
+
+.hero-rail {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  z-index: 2;
+  display: grid;
+  width: min(100%, 980px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.hero-rail div {
+  display: grid;
+  gap: 4px;
+}
+
+.hero-rail strong {
+  line-height: 1;
+}
+
+section {
+  scroll-margin-top: 88px;
+}
+
+.section-copy,
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 36px;
+}
+
+.section-copy {
+  align-items: end;
+}
+
+.section-heading {
+  align-items: center;
+}
+
+.section-copy h2,
+.section-heading h2,
+.join-copy h2 {
+  max-width: 780px;
+  margin-bottom: 0;
+}
+
+.record-hub {
+  position: relative;
+  padding-top: clamp(36px, 6vw, 72px);
+}
+
+.record-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(280px, 0.7fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.record-card,
+.platform-card {
+  position: relative;
+  min-height: 270px;
+  overflow: hidden;
+}
+
+.record-card::before,
+.platform-card::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.62), transparent 24%),
+    linear-gradient(25deg, transparent 54%, rgba(255, 255, 255, 0.24) 55%, transparent 68%);
+  opacity: 0.8;
+}
+
+.record-card:hover,
+.platform-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 32px 92px rgba(31, 44, 68, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.record-card > *,
+.platform-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.record-card span {
+  display: inline-flex;
+  margin-bottom: 58px;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.record-card h3,
+.platform-card h3 {
+  margin-bottom: 12px;
+}
+
+.record-card p,
+.platform-card p {
+  max-width: 520px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.video-card {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.3)),
+    linear-gradient(120deg, rgba(213, 78, 114, 0.14), transparent 54%);
+}
+
+.platform-card {
+  min-height: 270px;
+  display: grid;
+  align-content: space-between;
+}
+
+.workspace {
+  padding-top: clamp(46px, 7vw, 88px);
+}
+
+.board-grid,
+.archive-grid,
+.video-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.board-grid {
+  grid-template-columns: 1fr 1fr minmax(260px, 0.72fr);
+}
+
+.board-panel,
+.timeline-list article,
+.archive-card,
+.video-card-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.board-panel::before,
+.timeline-list article::before,
+.archive-card::before,
+.video-card-item::before,
+.request-form::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.56), transparent 25%),
+    linear-gradient(28deg, transparent 56%, rgba(255, 255, 255, 0.22) 57%, transparent 72%);
+}
+
+.board-panel {
+  min-height: 320px;
+}
+
+.board-panel.highlight {
+  display: grid;
+  align-content: end;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.3)),
+    linear-gradient(120deg, rgba(255, 107, 74, 0.14), transparent 58%);
+}
+
+.board-panel > *,
+.timeline-list article > *,
+.archive-card > *,
+.video-card-item > *,
+.request-form > * {
+  position: relative;
+  z-index: 1;
+}
+
+.board-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 26px;
+}
+
+.board-head strong {
+  font-size: 28px;
+}
+
+.status-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 52px;
+  padding: 12px 0;
+}
+
+.status-list span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.status-list strong {
+  color: var(--amber);
+  font-size: 30px;
+}
+
+.board-panel h3,
+.timeline-list h3,
+.archive-card h3,
+.video-card-item h3 {
+  margin-bottom: 10px;
+}
+
+.board-panel p,
+.timeline-list p,
+.archive-card span,
+.video-card-item p,
+.request-copy p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.request-section {
+  grid-template-columns: minmax(0, 0.92fr) minmax(340px, 1.08fr);
+  gap: clamp(28px, 5vw, 72px);
+  align-items: start;
+}
+
+.request-copy {
+  top: 112px;
+}
+
+.request-copy h2 {
+  margin-bottom: 18px;
+}
+
+.request-form {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  padding: clamp(22px, 4vw, 38px);
+  overflow: hidden;
+}
+
+.request-form label,
+.cas-field {
+  display: grid;
+  gap: 8px;
+}
+
+.request-form span,
+.cas-field legend {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.request-form input,
+.request-form select,
+.request-form textarea {
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.request-form textarea {
+  font: inherit;
+}
+
+.cas-grid label {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.cas-grid span {
+  min-width: 18px;
+}
+
+.cas-grid input {
+  min-width: 0;
+  text-align: center;
+}
+
+.request-status {
+  min-height: 24px;
+  margin: 0;
+  color: var(--cyan);
+  font-weight: 800;
+}
+
+.timeline-list {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.timeline-list article {
+  min-height: 300px;
+  padding: 28px;
+}
+
+.timeline-list time {
+  display: inline-flex;
+  margin-bottom: 54px;
+  color: var(--rose);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.timeline-list article > span {
+  display: inline-flex;
+  margin-top: 24px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.38);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.archive-grid {
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+}
+
+.archive-card {
+  display: grid;
+  align-content: start;
+}
+
+.archive-card img {
+  aspect-ratio: 4 / 3;
+  height: auto;
+  object-fit: cover;
+}
+
+.archive-card div {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.archive-card h3,
+.archive-card .panel-label {
+  margin: 0;
+}
+
+.archive-card .button,
+.video-section .button {
+  width: max-content;
+}
+
+.video-card-item {
+  display: grid;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.video-card-item:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 32px 88px rgba(31, 44, 68, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.video-card-item img {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.video-card-item div {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+}
+
+.video-card-item span {
+  width: max-content;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(21, 23, 29, 0.78);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.team-panel h3,
+.event-track h3 {
+  margin-bottom: 12px;
+}
+
+.team-panel p,
+.event-track p,
+.join-copy p {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.works {
+  background: transparent;
+  overflow: hidden;
+}
+
+.works .section-heading {
+  margin-bottom: 20px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  grid-auto-rows: 8px;
+  grid-auto-flow: dense;
+  align-items: start;
+  gap: 18px;
+}
+
+.shot {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px;
+  color: var(--ink);
+  cursor: zoom-in;
+  text-align: left;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.shot::after {
+  position: absolute;
+  inset: 1px;
+  pointer-events: none;
+  content: "";
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 34%, rgba(255, 255, 255, 0.16));
+  mix-blend-mode: screen;
+}
+
+.shot.wide {
+  width: 100%;
+}
+
+.shot.tall {
+  width: 100%;
+}
+
+.shot img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  object-fit: contain;
+  opacity: 1;
+  transition: transform 400ms ease, opacity 220ms ease;
+}
+
+.shot:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 26px 76px rgba(31, 44, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.team-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.team-panel {
+  min-height: 410px;
+  padding: clamp(24px, 4vw, 46px);
+}
+
+.team-panel ul {
+  display: grid;
+  gap: 12px;
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-panel li {
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.event-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(230px, 1fr));
+  gap: 1px;
+  overflow-x: auto;
+}
+
+.event-track article {
+  padding: 28px;
+  border-radius: 0;
+}
+
+.event-track time {
+  display: inline-flex;
+  margin-bottom: 42px;
+  color: var(--rose);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.join {
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: clamp(26px, 5vw, 72px);
+  align-items: start;
+}
+
+.join-copy {
+  top: 110px;
+}
+
+.join-copy p {
+  max-width: 620px;
+  margin-top: 22px;
+}
+
+.join-form {
+  display: grid;
+  gap: 18px;
+  padding: clamp(22px, 4vw, 38px);
+}
+
+.join-form span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.join-form input,
+.join-form select,
+.join-form textarea {
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.join-form select option {
+  color: #15110d;
+}
+
+.form-status {
+  min-height: 24px;
+  margin: 0;
+  color: var(--cyan);
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  place-items: center;
+  padding: 74px clamp(18px, 4vw, 48px) 40px;
+  background: rgba(237, 242, 247, 0.74);
+  backdrop-filter: blur(28px) saturate(1.2);
+}
+
+.lightbox.is-open {
+  display: grid;
+}
+
+.lightbox img {
+  max-width: min(1200px, 94vw);
+  max-height: 78vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 30px 90px rgba(31, 44, 68, 0.38);
+}
+
+.lightbox .lightbox-caption {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+  backdrop-filter: blur(18px);
+}
+
+@media (max-width: 980px) {
+
+  .hero-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    margin-top: 44px;
+  }
+
+  .team-layout,
+.record-layout,
+.board-grid,
+.request-section,
+.archive-grid,
+.video-grid,
+.join {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .site-header {
+    align-items: flex-start;
+  }
+
+  .section-copy,
+  .section-heading {
+    display: grid;
+  }
+
+  .gallery-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .archive-card .button,
+  .video-section .button {
+    width: 100%;
+  }
+
+  .shot,
+  .shot.wide,
+  .shot.tall {
+    width: 100%;
+  }
+}
+
+/* ==================================================================
+   数据驱动模式新增组件（登录门 / 上传面板 / 弹窗 / toast / 空态）
+   ================================================================== */
+
+.member-zone {
+  display: flex;
+}
+
+.member-toggle {
+  cursor: pointer;
+}
+
+.member-toggle:hover {
+  transform: translateY(-1px);
+}
+
+/* 弹窗 */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal.is-open {
+  display: grid;
+}
+
+.modal-card {
+  position: relative;
+  width: min(420px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  padding: clamp(24px, 4vw, 34px);
+}
+
+.modal-card--wide {
+  width: min(560px, 100%);
+}
+
+.modal-card h3 {
+  margin-bottom: 10px;
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.modal-note {
+  margin-bottom: 18px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  backdrop-filter: blur(14px);
+}
+
+.modal form {
+  display: grid;
+  gap: 14px;
+}
+
+.modal form span,
+.mode-tabs legend {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.modal form input,
+.modal form select,
+.modal form textarea {
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  font: inherit;
+}
+
+.modal form textarea {
+  resize: vertical;
+}
+
+.modal-status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--cyan);
+  font-weight: 800;
+}
+
+.mode-tabs input {
+  width: auto;
+}
+
+.mode-panel {
+  display: grid;
+  gap: 12px;
+}
+
+/* 提示条 */
+.toast {
+  left: 50%;
+  bottom: 26px;
+  z-index: 60;
+  transform: translate(-50%, 16px);
+  max-width: min(90vw, 520px);
+  padding: 12px 18px;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.toast.error {
+  background: rgba(213, 78, 114, 0.94);
+}
+
+/* 空态 / 占位 */
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 34px 20px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.thumb-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  background:
+    linear-gradient(135deg, rgba(36, 125, 138, 0.72), rgba(213, 78, 114, 0.55)),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.2), transparent);
+}
+
+.muted-line {
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+/* 演示模式角标 */
+.demo-badge {
+  left: 14px;
+  bottom: 14px;
+  z-index: 55;
+  padding: 6px 12px;
+  font-weight: 800;
+}
+
+/* ==================================================================
+   前端打磨：入场动画 / 导航高亮 / 回顶部 / 灯箱导航 / 复制提取码 / 无障碍
+   ================================================================== */
+
+/* 滚动进入视口动画 */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* 回到顶部 */
+.back-to-top {
+  position: fixed;
+  right: 18px;
+  bottom: 22px;
+  z-index: 45;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  box-shadow: 0 12px 30px rgba(31, 44, 68, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px) saturate(1.3);
+  transition: opacity 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+}
+.back-to-top.show {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.back-to-top:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(31, 44, 68, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* 灯箱导航按钮 + 计数 */
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 30px;
+  line-height: 1;
+  transform: translateY(-50%);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 10px 28px rgba(31, 44, 68, 0.16);
+}
+.lightbox-prev {
+  left: 22px;
+}
+.lightbox-next {
+  right: 22px;
+}
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+.lightbox-counter {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+/* 网盘操作区 + 复制按钮 */
+.netdisk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.copy-code {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 13px;
+  backdrop-filter: blur(16px);
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.copy-code:hover {
+  transform: translateY(-2px);
+}
+
+/* 无障碍：键盘焦点态（输入框已有 border 变色焦点，这里只补链接/按钮） */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* 减少动态效果偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .back-to-top,
+  .button,
+  .record-card,
+  .platform-card,
+  .video-card-item,
+  .shot {
+    transition: none;
+  }
+  * {
+    animation: none !important;
+  }
+}
+
+/* 阅读进度条 */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  height: 3px;
+  width: 0;
+  transition: width 80ms linear;
+}
+
+/* 视频卡片封面（播放图标） */
+.video-cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  background:
+    linear-gradient(135deg, rgba(36, 125, 138, 0.72), rgba(213, 78, 114, 0.55)),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.18), transparent);
+}
+.video-play {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  padding-left: 5px;
+  border-radius: 50%;
+  background: rgba(21, 23, 29, 0.72);
+  color: #fff;
+  font-size: 20px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 28px rgba(31, 44, 68, 0.24);
+}
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.footer-brand {
+  display: grid;
+  gap: 4px;
+}
+.footer-brand strong {
+  font-size: 16px;
+}
+.footer-brand span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+.footer-links a {
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  transition: color 160ms ease, background 160ms ease;
+}
+.footer-social {
+  display: flex;
+  gap: 10px;
+}
+.footer-social a {
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  transition: transform 160ms ease, background 160ms ease;
+}
+.footer-social a:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.82);
+}
+.footer-copy {
+  max-width: 1280px;
+  margin: 26px auto 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 跳到主要内容（键盘无障碍） */
+.skip-link {
+  position: absolute;
+  top: -9999px;
+  left: 12px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 0 0 8px 8px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 800;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* 移动端汉堡菜单按钮（桌面隐藏） */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(31, 44, 68, 0.1);
+  backdrop-filter: blur(16px);
+}
+.nav-toggle span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+.nav-toggle.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.nav-toggle.open span:nth-child(2) {
+  opacity: 0;
+}
+.nav-toggle.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+@media (max-width: 680px) {
+  .nav-toggle {
+    display: flex;
+  }
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 24px 60px rgba(31, 44, 68, 0.18);
+    backdrop-filter: blur(24px);
+  }
+  .nav-links.open {
+    display: flex;
+  }
+  .nav-links a,
+  .nav-links a:nth-child(4),
+  .nav-links a:nth-child(5) {
+    display: block;
+    padding: 12px 14px;
+    text-align: center;
+    font-size: 15px;
+  }
+}
+
+/* ==================================================================
+   设计打磨：字体排印 / 强调 / 悬停 / 滚动条 / 选区
+   ================================================================== */
+
+/* 字体渲染 + 文本选区 */
+body {
+  -moz-osx-font-smoothing: grayscale;
+}
+::selection {
+  background: rgba(255, 107, 74, 0.22);
+  color: var(--ink);
+}
+
+/* 区块眉题前加渐变短横线 */
+.eyebrow::before {
+  content: "";
+  width: 22px;
+  height: 2px;
+  margin: 0 10px 2px 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--amber), var(--cyan));
+  vertical-align: middle;
+}
+
+/* 标题换行更均衡 */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+/* 主按钮渐变更饱满、阴影更有层次 */
+.button.primary {
+  box-shadow: 0 12px 34px rgba(213, 78, 114, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* 图片悬停轻微放大 */
+.archive-card img {
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.archive-card:hover img {
+  transform: scale(1.05);
+}
+.shot:hover img {
+  transform: scale(1.03);
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(21, 23, 29, 0.2);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(21, 23, 29, 0.32);
+  background-clip: content-box;
+}
+
+/* 减少动态：关闭图片缩放过渡 */
+@media (prefers-reduced-motion: reduce) {
+  .archive-card img,
+  .shot img {
+    transition: none;
+  }
+}
+
+/* 顶栏滚动状态：滚过顶部后背景更实、阴影更强 */
+.site-header {
+  transition: background 220ms ease, box-shadow 220ms ease;
+}
+
+/* ==================================================================
+   去 Vibe-Coding 重构：收敛配色 / 去渐变与光效 / 扁平化卡片
+   ================================================================== */
+.eyebrow::before {
+  display: none;
+}
+h1,
+.kicker,
+.hero-rail strong {
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  -webkit-text-fill-color: initial;
+}
+
+/* —— 按钮：单一强调色，去渐变去光晕 —— */
+.button {
+  backdrop-filter: none;
+}
+
+/* —— 扁平化容器：去渐变、去 blur、去重阴影，统一白底 + 细边框 + 轻阴影 —— */
+.site-header,
+.hero-content,
+.hero-rail,
+.record-card,
+.platform-card,
+.board-panel,
+.timeline-list article,
+.archive-card,
+.video-card-item,
+.request-form,
+.join-form,
+.team-panel,
+.event-track,
+.event-track article,
+.shot {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px var(--shadow);
+  backdrop-filter: none;
+}
+
+/* 移除玻璃反光 sheen 覆盖层 */
+.record-card::before,
+.platform-card::before,
+.board-panel::before,
+.timeline-list article::before,
+.archive-card::before,
+.video-card-item::before,
+.request-form::before,
+.shot::after {
+  display: none;
+}
+
+/* 分隔线统一为深色细线 */
+.status-list li {
+  border-top: 1px solid var(--border);
+}
+
+/* 区块横条（strip）去 blur，改为浅色表面 */
+.strip {
+  background: var(--surface-2);
+  backdrop-filter: none;
+}
+
+/* 团队面板强调块去彩色 */
+.team-panel.accent {
+  background: var(--surface-2);
+}
+
+/* 导航悬停/激活：浅灰底 + 深字（白底上可见） */
+.nav-links a:hover {
+  background: rgba(23, 25, 29, 0.05);
+}
+.nav-links a.active {
+  background: rgba(23, 25, 29, 0.06);
+  box-shadow: none;
+}
+
+/* 复制提取码按钮：中性色，悬停/成功态用强调色 */
+.copy-code {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surface);
+}
+.copy-code:hover {
+  border-color: rgba(23, 25, 29, 0.24);
+}
+.copy-code.copied {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* 状态徽章回归中性 */
+.timeline-list article > span {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+/* 页脚扁平化 + 悬停浅灰 */
+.site-footer {
+  backdrop-filter: none;
+}
+.footer-links a:hover {
+  background: rgba(23, 25, 29, 0.05);
+  color: var(--text);
+}
+
+/* 阅读进度条与演示角标改用单一强调色 */
+.scroll-progress {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+/* ==================================================================
+   DeepSeek Harness 风格 · 蓝 #4D6BFE / Montserrat / 大圆角白卡片
+   ================================================================== */
+.section-copy h2,
+.section-heading h2,
+.join-copy h2,
+.request-copy h2 {
+  font-size: clamp(28px, 3.8vw, 42px);
+  line-height: 1.18;
+}
+h3,
+.record-card h3,
+.platform-card h3,
+.board-panel h3,
+.timeline-list h3,
+.archive-card h3,
+.video-card-item h3,
+.team-panel h3,
+.event-track h3 {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
+/* —— 卡片：白底 + 16px 圆角 —— */
+.site-header,
+.hero-rail,
+.record-card,
+.platform-card,
+.board-panel,
+.timeline-list article,
+.archive-card,
+.video-card-item,
+.request-form,
+.join-form,
+.team-panel,
+.event-track,
+.shot,
+.modal-card {
+  border-radius: 16px;
+}
+.hero-content {
+  background: transparent;
+  box-shadow: none;
+}
+.hero-rail {
+  box-shadow: none;
+}
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.button.primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+.button.ghost {
+  border-color: var(--border);
+}
+
+/* —— 焦点统一蓝色 —— */
+a:focus-visible,
+button:focus-visible {
+  outline-color: var(--accent);
+}
+.request-form input:focus,
+.request-form select:focus,
+.request-form textarea:focus,
+.join-form input:focus,
+.join-form select:focus,
+.join-form textarea:focus,
+.modal form input:focus,
+.modal form select:focus,
+.modal form textarea:focus {
+  border-color: var(--accent);
+}
+
+/* —— 小元素圆角 —— */
+.copy-code,
+.cas-grid label,
+.mode-tabs label,
+.timeline-list article > span,
+.demo-badge {
+  border-radius: 8px;
+}
+
+/* ================================================================== *
+ * Apple 结构 + Sequoia 配色（唯一覆盖层）
+ *
+ * 结构、字排、按钮形状、章节节奏 → apple.com
+ * 颜色 → sequoiacap.com（绿 #007354 取代 Apple 的蓝 #0071e3）
+ *
+ * 此前叠了 6 层互相打架的覆盖，已整体删除重写。改风格请改这一层，
+ * 不要再往后追加 —— 之前两个 bug 都是叠层残留导致的。
+ * （本层用到的设计令牌已并入文件开头唯一的 :root。）
+ * ================================================================== */
+
+
+/* —— 先清空底层遗留的玻璃拟态（带色渐变 + 厚阴影 + 毛玻璃）——
+   底层有 49 处 box-shadow、28 处 backdrop-filter，逐条改既啰嗦又会漏，
+   所以一次清零；随后在「材质分级」一节里按层级显式加回来。
+   这条用 !important，那一节也用 !important（同优先级、更靠后者胜）。 */
+*, *::before, *::after {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+body::before, body::after { content: none; display: none; }
+.hero::before, .hero::after { display: none; }
+.timeline-list article::before, .archive-card::before,
+.video-card-item::before, .request-form::before { content: none; display: none; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;              /* Apple 的正文基准 */
+  line-height: 1.47;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* —— 字排：大、紧、居中 —— */
+h1, h2, h3, h4 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+  color: var(--text);
+}
+h1 { font-size: clamp(40px, 5.6vw, 72px); }
+h2 { font-size: clamp(32px, 4vw, 52px); }
+h3 { font-size: 22px; }
+p { color: var(--text-muted); }
+.eyebrow, .kicker, .panel-label, .roster-role {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
+}
+.brand strong {
+  font-size: 15px; font-weight: 600; letter-spacing: -0.01em; text-transform: none;
+}   /* 只藏标语，别藏 .brand-copy 容器本身 */
+.nav-links { gap: 0; }
+.nav-links a {
+  margin: 0 14px; padding: 0; border: 0; background: transparent;
+  font-size: 12px; font-weight: 400; letter-spacing: 0;
+  text-transform: none; color: var(--text);
+}
+.nav-links a:hover, .nav-links a.active { color: var(--accent); }
+
+/* —— hero：Apple 式居中大字 —— */
+.hero {
+  min-height: 0;
+  height: auto;
+  padding: 76px 22px 60px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+}
+.hero-content {
+  max-width: var(--w-content);
+  padding: 0; border: 0; text-align: center;
+}
+.hero h1 { text-wrap: balance; margin: 0; }
+
+/* —— 章节：白 / 浅灰交替，内容居中 —— */
+section {
+  padding: 88px 22px;
+  background: var(--bg);
+}
+#workspace, #library, #works, #teams, #join { background: var(--surface); }
+.section-heading {
+  max-width: var(--w-wide);
+  margin: 0 auto 40px;
+  padding: 0;
+  border: 0;
+  text-align: center;
+}
+.section-heading > div { margin: 0 auto; }
+.section-lede {
+  max-width: 640px;
+  margin-inline: auto;
+  font-size: 19px;
+  color: var(--text-muted);
+}
+.record-layout,
+.timeline-list,
+.members-layout,
+.board-grid,
+.archive-grid,
+.video-grid,
+.gallery-grid {
+  max-width: var(--w-wide);
+  margin-inline: auto;
+}
+
+/* —— 统计带 —— */
+.stat-band { padding: 0 22px 72px; background: var(--bg); }
+.hero-rail {
+  max-width: var(--w-wide); margin-inline: auto;
+  border: 0; gap: 0; background: transparent;
+}
+.hero-rail div { border: 0; padding: 0 20px; text-align: center; background: transparent; }
+.hero-rail strong {
+  display: block; font-size: clamp(34px, 3.6vw, 52px);
+}
+.hero-rail span { font-size: 14px; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+
+/* —— 按钮：Apple 胶囊 + Sequoia 绿 —— */
+.button, .member-toggle, #upload-entry {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 12px 22px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 17px; font-weight: 400; letter-spacing: 0; text-transform: none;
+}
+/* 次要动作 = 绿色文字链 + 尖括号 */
+.button.ghost {
+  padding: 0; background: transparent;
+  border-radius: 0; font-size: 17px;
+}
+.button.ghost::after { content: " ›"; }
+.button.ghost:hover { background: transparent; text-decoration: underline; text-underline-offset: 4px; }
+
+/* —— 卡片：圆角、无边框、浅灰底 —— */
+.record-card,
+.platform-card,
+.board-panel,
+.archive-card,
+.video-card-item,
+.member-form,
+.member-roster {
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  padding: 32px;
+  color: var(--text);
+}
+#workspace .board-panel,
+#library .archive-card,
+#works .gallery-grid > *,
+#join .join-form {
+  background: #fff;
+}
+
+/* —— 活动图块：Apple 产品卡（圆角 + 满幅图 + 图上白字）—— */
+.timeline-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.timeline-list article.tile {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 32px;
+  border: 0;
+  overflow: hidden;
+  background: var(--surface);
+  text-align: center;
+}
+.tile-frame { display: none; }        /* 发丝框是 Sequoia 的骨架，Apple 不用 */
+.timeline-list article.tile > .tile-img {
+  position: absolute; inset: 0; z-index: 0;
+  width: 100%; height: 100%; object-fit: cover; margin: 0; padding: 0; border: 0;
+}
+.timeline-list article.tile > span.tile-scrim {
+  position: absolute; inset: 0; z-index: 1;
+  display: block; margin: 0; padding: 0; border: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.62) 100%);
+}
+.timeline-list article.tile > span.tile-badge {
+  position: absolute; top: 24px; left: 0; right: 0; z-index: 4;
+  display: block; margin: 0; padding: 0; border: 0; background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--accent);
+}
+.timeline-list article.tile > span.tile-badge i { display: none; }
+.timeline-list article.tile > .tile-body { position: relative; z-index: 4; }
+.timeline-list article.tile time {
+  display: block; margin: 0 0 6px; font-size: 13px; color: var(--text-muted);
+}
+.timeline-list article.tile h3 { font-size: 28px; margin: 0 0 8px; }
+.timeline-list article.tile p { font-size: 15px; margin: 0; }
+.timeline-list article.tile .tile-status {
+  display: inline-block; margin-top: 14px; padding: 0; border: 0;
+  background: transparent; font-size: 13px; color: var(--accent);
+}
+.tile.has-cover .tile-badge { color: #fff; }
+.tile.has-cover h3, .tile.has-cover time,
+.tile.has-cover p, .tile.has-cover .tile-status { color: #fff; }
+label > span { font-size: 14px; color: var(--text-muted); }
+.skill-chip {
+  font-family: var(--font-sans); text-transform: none; letter-spacing: 0;
+}
+.roster-card, .group-card {
+  border: 0; background: #fff; padding: 16px 18px; margin-bottom: 10px;
+}
+.roster-skills span, .group-members span {
+  border: 0; text-transform: none; letter-spacing: 0;
+}
+.group-warnings { border-radius: 14px; }
+.empty-state { border: 0; background: var(--surface); color: var(--text-muted); }
+
+/* —— 页脚：Apple 的浅灰小字 —— */
+.site-footer {
+  background: var(--surface); color: var(--text-muted);
+  padding: 40px 22px; border: 0; border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.site-footer a { color: var(--text-muted); }
+.site-footer a:hover { color: var(--accent); text-decoration: underline; }
+.site-footer strong { color: var(--text); font-size: 12px; }
+
+.toast { border-radius: var(--radius-pill); }
+.demo-badge { font-size: 12px; }
+
+@media (max-width: 980px) {
+  section { padding: 64px 22px; }
+  .timeline-list { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding: 56px 22px 44px; }
+}
+@media (max-width: 680px) {
+  .hero-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 0; }
+  .timeline-list article.tile { aspect-ratio: 3 / 2; padding: 24px; }
+}
+
+/* —— 两处修正 —— */
+/* 1) 给按钮写 display 会盖掉浏览器默认的 [hidden]{display:none}，
+      导致「上传/贴链接」在未登录时照样显示。必须显式让 hidden 赢。 */
+[hidden] { display: none !important; }
+
+/* 2) .brand 在 flex 头部里被压成 0 宽，logo 整个看不见 */
+.brand {
+  flex: none;
+  min-width: max-content;
+  margin-right: auto;
+  text-decoration: none;
+}
+.brand strong { display: inline-block; white-space: nowrap; color: var(--text); }
+
+/* hero 标题在 1440 下 72px 偏大，收到 Apple 的量级 */
+.hero h1 { font-size: clamp(36px, 4.4vw, 56px); }
+
+/* —— 图块收尾：底层 `.timeline-list article > span` 优先级(0,2,2)高于裸类名，
+      必须用同等具体度才压得住，否则 .tile-frame 会变成一条白底横杠。 —— */
+.timeline-list article.tile > span.tile-frame {
+  display: none !important;
+}
+.timeline-list article.tile.has-cover time,
+.timeline-list article.tile.has-cover p,
+.timeline-list article.tile.has-cover .tile-status {
+  color: rgba(255, 255, 255, 0.92);
+}
+.timeline-list article.tile.has-cover h3 { color: #fff; }
+.timeline-list article.tile.has-cover > span.tile-badge { color: #fff; }
+
+/* —— 成员区 / 技能 / 分组的结构（合并时随旧层一起删掉了，这里按 Apple 样式重建）—— */
+.members-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  text-align: left;
+}
+.member-form { display: grid; gap: 20px; }
+.member-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.member-grid-wide { grid-column: 1 / -1; }
+.member-form label,
+.join-form label,
+.request-form label,
+.modal form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.member-status, .group-status {
+  margin: 0; min-height: 20px;
+}
+
+.skill-picker { display: grid; gap: 10px; }
+.skill-drop {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  min-height: 76px; padding: 14px;
+}
+.skill-pool { min-height: 0; }
+.skill-hint { align-self: center; }
+.skill-chip { cursor: grab; touch-action: none; user-select: none; }
+.skill-chip.dragging { opacity: 0.35; }
+.skill-ghost {
+  /* 不再 translate(-50%,-50%)：位置由抓取点决定，标签不会跳到指针中心 */
+  position: fixed; z-index: 80; pointer-events: none;
+}
+
+.member-roster { padding: 28px; }
+.roster-list { display: grid; gap: 10px; margin-top: 10px; }
+.roster-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.roster-meta { margin: 4px 0 0; }
+.roster-skills, .group-members { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+
+.group-tool { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.group-lede { margin: 4px 0 14px; }
+.group-controls { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.group-controls label { display: grid; gap: 6px; }
+.group-result { display: grid; gap: 10px; margin-top: 14px; }
+.group-card h4 {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px; font-size: 17px;
+}
+.group-card h4 em { font-size: 13px; font-style: normal; color: var(--text-muted); }
+.group-skills, .group-reason { margin: 8px 0 0; }
+.group-warnings { margin: 0; padding: 12px 16px 12px 32px; font-size: 14px; }
+
+@media (max-width: 980px) {
+  .members-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 680px) {
+  .member-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ================================================================== *
+ * 表单控件：统一的一套语言
+ *
+ * 此前并存三套（10px/#f5f5f7/53高、12px/#fff/51高、10px/#f5f5f7/45高），
+ * 外加没样式的单选框。根因是底层 `.request-form input` `.cas-grid input`
+ * 这类 (0,1,1) 选择器压过了通用的 `input`。所以这里把同一批选择器
+ * 全列一遍，靠「同优先级、更靠后」取胜。
+ *
+ * 规格：白底 + 1px 发丝边 + 12px 圆角 + 48px 高 + 17px 字。
+ * 白底带边框在白区和灰卡上都成立，所以不依赖容器底色。
+ * 焦点用 outline 而非 box-shadow —— 上面的扁平化重置把阴影全禁了。
+ * ================================================================== */
+
+input, select, textarea,
+.request-form input, .request-form select, .request-form textarea,
+.join-form input, .join-form select, .join-form textarea,
+.member-form input, .member-form select, .member-form textarea,
+.modal form input, .modal form select, .modal form textarea,
+.cas-grid input, .group-controls input {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-sans);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+textarea, .request-form textarea, .join-form textarea, .member-form textarea {
+  resize: vertical;
+}
+
+/* 字段标签：统一小字 + 统一间距 */
+.request-form label > span,
+.join-form label > span,
+.member-form label > span,
+.modal form label > span,
+.group-controls label > span {
+  display: block;
+  margin-bottom: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* CAS：C/A/S 三个数字框，此前比别人矮 8px。改成字母做前缀、字段本身与其他一致 */
+.cas-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+.cas-field legend {
+  padding: 0;
+  margin-bottom: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.cas-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cas-grid label {
+  position: relative;
+  display: block;
+  margin: 0; padding: 0; border: 0; background: transparent; border-radius: 0;
+}
+.cas-grid span {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* 入库方式：改成 Apple 的分段控件 */
+.mode-tabs { min-width: 0; margin: 0; border: 0; }
+.mode-tabs legend {
+  padding: 0; margin-bottom: 8px;
+  text-transform: none; letter-spacing: 0;
+}
+.mode-tabs > label,
+.mode-tabs label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 14px;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.mode-tabs label:hover { border-color: #6e6e73; }
+.mode-tabs label:has(input:checked) {
+  border-color: var(--accent);
+}
+.mode-tabs input[type="radio"] {
+  position: absolute;
+  width: 1px; height: 1px; min-height: 0;
+  padding: 0; margin: -1px; border: 0;
+  clip: rect(0 0 0 0); overflow: hidden;
+}
+
+/* ================================================================== *
+ * 材质分级（Apple Design：Materials & Depth）
+ *
+ * 三条规矩：
+ *   1. 浮动区域（导航/工具条/弹层）用 backdrop-filter 做半透明，
+ *      但不叠第二层半透明 —— 叠了就看不清。
+ *   2. 面越大，模糊和阴影越重；小控件轻。压在图片等杂乱内容上的再重一点。
+ *   3. 需要聚焦时用遮罩压低背景；不该打断流程时只用偏移+透明度。
+ * ================================================================== */
+/* 边缘用渐变过渡，不用硬边框 —— 只在内容与 chrome 交叠处 */
+.site-header::after {
+  position: absolute;
+  left: 0; right: 0; top: 100%;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.045), rgba(0, 0, 0, 0));
+}
+
+/* —— B 层：大表面（弹窗）—— 强模糊 + 深阴影 + 遮罩压背景 —— */
+.modal {
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px) !important;      /* 把背景推远，制造聚焦 */
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+.modal-card,
+.modal-card--wide {
+  /* 颜色放在实心层上，不放在半透明前景 —— 否则文字发灰 */
+  background: #fff;
+  background-image: none;
+  border: 0;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* —— C 层：小控件 —— 轻阴影、不加模糊 —— */
+.button, .member-toggle, #upload-entry {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+}
+.button:hover, .member-toggle:hover, #upload-entry:hover {
+  box-shadow: 0 2px 6px rgba(0, 115, 84, 0.22) !important;
+}
+.button.ghost, .button.ghost:hover { box-shadow: none !important; }
+.skill-ghost {
+  /* 拖拽中的标签是「拿起来」的小控件：抬高但仍属小件 */
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* 卡片按「压在什么上面」分级：图片上的重，纯色上的轻 */
+.timeline-list article.tile.has-cover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14) !important;
+}
+.timeline-list article.tile:not(.has-cover),
+.record-card,
+.platform-card,
+.board-panel,
+.archive-card,
+.video-card-item {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+.roster-card, .group-card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important; }
+
+/* —— 不打断流程的浮层：半透明 + 偏移，不加遮罩 —— */
+.toast {
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+}
+
+/* 输入框保持平面：它们在卡片里，再加阴影就是第二层材质了 */
+input, select, textarea { box-shadow: none !important; }
+
+/* ================================================================== *
+ * 尺度系统：圆角随尺寸走 + 输入框去边框
+ *
+ * 问题诊断（实测）：圆角恒定在 12–18px，而元素高度跨 50→912px，
+ * 圆角/高度比从 0.240 塌到 0.020。大面板配小圆角 =「方盒子啃一口」。
+ *
+ * 两条规则：
+ *   1. 面越大，圆角越大（次线性递增），保持视觉上的比例感。
+ *   2. 紧贴嵌套时用同心圆角：内圆角 = 外圆角 − 间距，
+ *      这样父子的弧线是平行的。间距很大时不适用（子元素视觉独立）。
+ *
+ * 注：Apple HIG 的官方数值没抓到（页面是 JS 渲染的），
+ * 下面的阶梯按「同心 + 次线性」这两条通用原则推出，非照抄。
+ * ================================================================== */
+
+
+/* —— 输入框：去掉细边框，改成填充式 —— */
+input, select, textarea,
+.request-form input, .request-form select, .request-form textarea,
+.join-form input, .join-form select, .join-form textarea,
+.member-form input, .member-form select, .member-form textarea,
+.modal form input, .modal form select, .modal form textarea,
+.cas-grid input, .group-controls input {
+  min-height: var(--ctl-h);
+  padding: 0 var(--ctl-pad-x);
+  border: 0;                       /* ← 那一小条细框去掉 */
+  border-radius: var(--r-3);
+  background: rgba(0, 0, 0, 0.045);
+  font-size: var(--ctl-fs);
+  line-height: var(--ctl-h);
+  transition: background 140ms ease, outline-color 140ms ease;
+}
+input:hover, select:hover, textarea:hover {
+  border: 0;
+  background: rgba(0, 0, 0, 0.07);
+}
+/* 聚焦：填充转白 + 绿环，状态变化一眼可见（不再靠边框颜色） */
+input:focus, select:focus, textarea:focus,
+.request-form input:focus, .join-form input:focus, .member-form input:focus,
+.modal form input:focus, .cas-grid input:focus {
+  border: 0;
+  background: #fff;
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+/* 文本域更高，圆角进一档 */
+textarea, .request-form textarea, .join-form textarea, .member-form textarea {
+  min-height: 120px;
+  padding: 13px var(--ctl-pad-x);
+  border-radius: var(--r-4);
+  line-height: 1.5;
+}
+
+/* 填充式字段要在白底上才读得出来，所以表单容器改白 */
+.member-form, .member-roster, .request-form, .join-form {
+  background: #fff;
+  border: 0;
+  border-radius: var(--r-6);
+}
+.cas-grid input { padding-left: 38px; }
+.cas-grid span { left: var(--ctl-pad-x); }
+select, .request-form select, .join-form select,
+.member-form select, .modal form select {
+  padding-right: 42px;
+  background-color: rgba(0, 0, 0, 0.045);
+}
+select:focus { background-color: #fff; }
+input[type="file"] { padding: 6px 8px; line-height: 1.3; }
+
+/* —— 分段控件：真正的同心圆角（外 12 − 内边距 3 = 内 9）—— */
+.mode-tabs {
+  display: flex;
+  gap: 0;
+  padding: 3px;
+  border-radius: var(--r-3);
+  background: rgba(0, 0, 0, 0.045);
+}
+.mode-tabs legend { float: left; width: 100%; }
+.mode-tabs > label,
+.mode-tabs label {
+  flex: 1;
+  width: auto;
+  min-height: 38px;
+  margin: 0;
+  border: 0;
+  border-radius: 13px;           /* = 16 − 3，弧线与外框平行 */
+  background: transparent;
+}
+.mode-tabs label + label { margin-left: 0; }
+.mode-tabs label:hover { background: rgba(0, 0, 0, 0.04); }
+.mode-tabs label:has(input:checked) { background: #fff; color: var(--text); }
+
+/* —— 圆角随尺寸递增 —— */
+.demo-badge { border-radius: var(--r-pill); }
+.skill-chip, .button, .member-toggle, #upload-entry,
+.roster-skills span, .group-members span, #back-to-top { border-radius: var(--r-pill); }
+.roster-card, .group-card, .skill-drop { border-radius: var(--r-4); }
+.record-card,
+.platform-card,
+.board-panel,
+.archive-card,
+.video-card-item { border-radius: var(--r-5); }
+.timeline-list article.tile, .modal-card, .modal-card--wide,
+.empty-state { border-radius: var(--r-6); }
+
+/* 控件内的文字统一按 44/17 的比例走 */
+.group-controls input { width: 104px; text-align: center; }
+
+/* 技能标签也去掉细边，跟输入框同一套填充语言 */
+.skill-chip {
+  border: 0;
+  background: rgba(0, 0, 0, 0.045);
+  padding: 9px 18px;
+  font-size: 15px;
+}
+.skill-chip:hover { border: 0; background: rgba(0, 0, 0, 0.08); color: var(--text); }
+#skill-selected .skill-chip { border: 0; }
+.skill-drop { border: 0; background: rgba(0, 0, 0, 0.03); }
+.skill-drop.drop-active { border: 0; }
+/* 名册里的技能小标签比可选标签更小一档 */
+.roster-skills span, .group-members span {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+/* ================================================================== *
+ * 连续曲率圆角（squircle）—— 苹果圆角的真正做法
+ *
+ * 普通 border-radius 是四分之一「圆弧」：弧线与直边相接处曲率突变，
+ * 半径越大，那个「折点」越明显，看起来就是「方盒子啃一口」。
+ * 苹果用的是超椭圆（continuous corner），曲率平滑过渡进直边。
+ * SwiftUI 里就是 RoundedRectangle(style: .continuous)。
+ *
+ * CSS 现在有对应属性：corner-shape。用法分两类——
+ *   · 圆角矩形面（卡片/面板/输入框）→ squircle，半径越大收益越明显
+ *   · 胶囊控件（按钮/标签）→ 保持 round，因为胶囊两端本来就该是半圆
+ *
+ * corner-shape 目前只有 Chrome 139+ 支持，Safari / Firefox 还没有。
+ * 所以整段包在 @supports 里：不支持的浏览器回落到普通圆弧，版式不变。
+ * ================================================================== */
+
+@supports (corner-shape: squircle) {
+  /* 大面：连续曲率最明显的地方 */
+  .timeline-list article.tile,
+.modal-card,
+.modal-card--wide,
+.member-form,
+.member-roster,
+.request-form,
+.join-form,
+.record-card,
+.platform-card,
+.board-panel,
+.archive-card,
+.video-card-item,
+.empty-state {
+    corner-shape: squircle;
+  }
+
+  /* 小控件：用更缓的指数，效果克制，不喧宾夺主 */
+  input, select, textarea,
+  .request-form input, .request-form select, .request-form textarea,
+  .join-form input, .join-form select, .join-form textarea,
+  .member-form input, .member-form select, .member-form textarea,
+  .modal form input, .modal form select, .modal form textarea,
+  .cas-grid input, .group-controls input,
+  .skill-drop, .roster-card, .group-card,
+  .mode-tabs, .mode-tabs label {
+    corner-shape: superellipse(3);
+  }
+
+  /* 胶囊保持真圆弧：两端就该是半圆，套 squircle 反而不对 */
+  .button, .member-toggle, #upload-entry, .skill-chip,
+  .roster-skills span, .group-members span,
+  #back-to-top, .demo-badge, .toast {
+    corner-shape: round;
+  }
+}
+
+/* ================================================================== *
+ * 动效（apple-design skill）
+ * 只动 transform / opacity（合成器友好），按下即反馈，尊重无障碍偏好。
+ * ================================================================== */
+
+/* —— 按压反馈：:active 在 pointer-down 就触发，不等松手 —— */
+.button, .member-toggle, #upload-entry, .skill-chip,
+.mode-tabs label, .record-card, .platform-card, .modal-close {
+  transition: transform 140ms cubic-bezier(0.32, 0.72, 0, 1),
+              background 140ms ease, color 140ms ease, opacity 140ms ease;
+}
+.button:active, .member-toggle:active, #upload-entry:active,
+.skill-chip:active, .mode-tabs label:active, .modal-close:active {
+  transform: scale(0.97);
+  transition: transform 100ms ease-out;
+}
+/* 大卡片按下时缩放要更轻，否则整块动起来很晃 */
+.record-card:active, .platform-card:active { transform: scale(0.994); }
+/* 拖动中的标签不参与按压缩放 */
+.skill-chip.dragging:active { transform: none; }
+
+/* 拖影：略微放大 + 抬起，读作「被拿起来」 */
+.skill-ghost { transform: scale(1.04); }
+
+/* —— 出场对称：从哪来回哪去 —— */
+.modal-card { transform-origin: center; }
+
+/* —— 无障碍偏好 —— */
+@media (prefers-reduced-motion: reduce) {
+  .button:active, .member-toggle:active, #upload-entry:active,
+  .skill-chip:active, .mode-tabs label:active,
+  .record-card:active, .platform-card:active { transform: none; }
+  .skill-ghost { transform: none; }
+  .toast { transition: opacity 200ms ease !important; }
+  html { scroll-behavior: auto !important; }
+}
+@media (prefers-contrast: more) {
+  /* 实底 + 明确描边 */
+  input, select, textarea { background: #fff; outline: 1px solid var(--text); outline-offset: -1px; }
+  .skill-chip { background: #fff; outline: 1px solid var(--text); outline-offset: -1px; }
+  p, .section-lede, label > span, ::placeholder { color: #3a3a3c; }
+}
+
+/* —— 导航条里的胶囊按钮：调轻 ——
+   实测原状：52px 的条里 36px 的胶囊（占 69%），12px 字 / 36px 胶囊 = 0.33。
+   Apple 的胶囊控件文字占比通常 0.40–0.44，低了就显得「充气」。
+   改成 30px 高（占 58%）、字重 500，比例回到 0.40。 */
+.member-toggle, #upload-entry {
+  line-height: 1;
+}
+
+/* ================================================================== *
+ * 导航条：居中浮岛 + Liquid Glass
+ *
+ * 为什么改成浮岛：原来是通栏，右上角那颗实心胶囊在大片空白里显得过重。
+ * 收成居中浮岛后，品牌 / 链接 / 登录都被同一块材质包住，
+ * 按钮不再是「空条里的一块重物」，而是材质的一部分。
+ *
+ * Liquid Glass 的四个要素（按已知视觉特征实现，Apple HIG 是 JS 渲染的抓不到）：
+ *   1. 强模糊 + 饱和度提升 + 轻微提亮 —— 玻璃本体
+ *   2. 镜面高光边：顶边亮、底边次亮，模拟光打在material边缘
+ *   3. 顶部渐变薄光 —— 光顺着弧面滑下去
+ *   4. 浮起阴影 —— 它是「悬在内容之上」的一层
+ * ================================================================== */
+
+/* SF Pro 自带光学尺寸与字距表，交给系统处理 */
+body, input, select, textarea, button { font-optical-sizing: auto; }
+
+/* 主按钮的光学居中：PingFang 的中文墨迹同样偏上约 0.5px。
+   .ghost 是纯文字链（padding 0），不参与。 */
+.button:not(.ghost) {
+  padding-top: 12.5px;
+  padding-bottom: 11.5px;
+}
+
+/* ================================================================== *
+ * 导航条：改回通栏（修正上一版的浮岛）
+ *
+ * 上一版做成了居中悬浮胶囊岛 —— 那其实是 iOS 26 浮动标签栏的模式，
+ * 不是 apple.com 的做法。Apple 网站的导航是：
+ *   · 通栏半透明条，不是浮岛
+ *   · 内容居中在定宽容器里（这才是「导航居中」的正确解法）
+ *   · 44px 高、12px 字，项目均匀铺开
+ *   · 最左品牌、最右功能入口
+ *   · 导航栏里没有任何实心背景按钮
+ *
+ * 注：抓取印证了结构（通栏 / 左右分布 / 无实心按钮），
+ * 但 CSS 数值抓不到（JS 渲染），尺寸按已知特征实现。
+ * ================================================================== */
+/* 浮岛时代的镜面高光与薄光，通栏不需要 */
+.site-header::before,
+.site-header::after { content: none; display: none; }
+.site-header .nav-links a {
+  margin: 0;
+  opacity: 1;
+}
+
+.site-header .brand { flex: none; margin: 0; }
+.member-toggle, #upload-entry {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.member-toggle:hover, #upload-entry:hover {
+  background: transparent !important;
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.member-toggle:active, #upload-entry:active { transform: none; }
+
+/* ================================================================== *
+ * 细节收尾
+ * ================================================================== */
+
+/* 1) 名册/分组的技能小标签：墨迹偏上 0.55px（唯一还没做光学补偿的真盒子） */
+.roster-skills span, .group-members span {
+  padding-top: 4.5px;
+  padding-bottom: 3.5px;
+}
+
+/* 2) 锚点跳转：导航条只有 44px，原来的 88px 让跳转后多空一截 */
+main > section,
+main > section[id] {
+  scroll-margin-top: 60px;
+}
+
+/* 3) 焦点环只在键盘导航时出现 —— 鼠标点按钮不该冒出一圈框 */
+.button:focus:not(:focus-visible),
+.member-toggle:focus:not(:focus-visible),
+#upload-entry:focus:not(:focus-visible),
+.skill-chip:focus:not(:focus-visible),
+.nav-links a:focus:not(:focus-visible),
+.brand:focus:not(:focus-visible),
+#back-to-top:focus:not(:focus-visible),
+.modal-close:focus:not(:focus-visible),
+.mode-tabs label:focus-within:not(:has(:focus-visible)) {
+  outline: none;
+}
+.button:focus-visible,
+.member-toggle:focus-visible,
+#upload-entry:focus-visible,
+.skill-chip:focus-visible,
+.nav-links a:focus-visible,
+.brand:focus-visible,
+#back-to-top:focus-visible,
+.modal-close:focus-visible,
+.mode-tabs label:has(:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: inherit;
+}
+/* 输入框相反：文字框点进去就该有焦点态，这是标准行为 */
+
+/* 4) 禁用态 —— 分组进行中按钮会被禁用，之前看不出任何变化 */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+button:disabled { pointer-events: none; }
+#group-run:disabled { opacity: 0.45; }
+
+/* 5) 数字输入用等宽数字：输入时字宽不跳 */
+input[type="number"],
+.cas-grid input,
+#group-count {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* 6) 移动端点击高亮改成透明 —— 默认那层灰色方块和圆角控件对不上 */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* ================================================================== *
+ * Liquid Glass（重做）
+ *
+ * 之前是「磨砂」不是「液态玻璃」：白 50% + blur 28px，把背后糊没了，
+ * 看起来是一块盖在上面的塑料板。真正的差别在三处：
+ *
+ *   1. 更透、更少模糊 —— 背后的内容要能看见形状
+ *   2. 自适应提亮 —— 这是关键。真 Liquid Glass 会把背后内容整体抬亮，
+ *      保留形状与色相，但让暗部不再吃掉文字。之前只有 brightness(1.04)，太轻。
+ *      对比测试 1.5 / 1.7 / 1.85 / 2.0 后取 1.85：文字全程可读，
+ *      同时还看得清人影和墙色；2.0 已经开始洗白丢内容。
+ *   3. 边缘折射 —— 亮镜面线紧挨一条暗折射线，模拟光在玻璃边缘弯折
+ * ================================================================== */
+
+/* 玻璃面上的文字：提对比 + 略加字重（skill 明确要求，别用平灰） */
+.site-header .nav-links a,
+.site-header .brand strong,
+.site-header .member-toggle {
+  color: rgba(0, 0, 0, 0.92);
+  font-weight: 500;
+  letter-spacing: 0.004em;
+}
+
+/* ================================================================== *
+ * 着色 Liquid Glass（绿）—— 演示角标 / 回顶部
+ *
+ * 与导航条的逻辑相反：
+ *   导航条是深色文字压在玻璃上 → 要「提亮」背景
+ *   这两个是白色文字压在绿玻璃上 → 要「压暗」背景
+ * 所以 brightness < 1。着色玻璃的高光也要更收敛，
+ * 因为深色表面上的镜面反射本来就比透明玻璃弱。
+ * ================================================================== */
+
+.demo-badge,
+#back-to-top {
+  backdrop-filter: blur(14px) saturate(180%) brightness(0.72) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(180%) brightness(0.72) !important;
+}
+
+/* ================================================================== *
+ * 首屏大图 —— 让导航玻璃真的有东西可折射
+ *
+ * 之前玻璃调对了却看不出来，根因是「背后没内容」：区块顶部大片白，
+ * 照片几乎不经过导航条后面。对照实验（条后塞纯红块 → 条内变 rgb(250,56,56)）
+ * 证明材质本身没问题。
+ *
+ * 遮罩做成上疏下密：
+ *   顶部只压一点点 → 导航条后面是接近原样的照片，玻璃立刻成立
+ *   往下渐浓到纯白 → 深色大标题照常可读
+ * 这也是 Apple 官网的常态：导航压在 hero 大图上。
+ * ================================================================== */
+
+.hero {
+  position: relative;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.10) 0%,
+      rgba(255, 255, 255, 0.42) 26%,
+      rgba(255, 255, 255, 0.86) 52%,
+      rgba(255, 255, 255, 0.98) 74%,
+      #ffffff 100%
+    ),
+    url("assets/events/stage-group-photo.webp");
+  background-size: auto, cover;
+  background-position: center, center 34%;
+  background-repeat: no-repeat, no-repeat;
+  padding-bottom: 72px;
+}
+/* 大标题压在照片上半部时要更稳：极轻的白色微光，不改变字色 */
+.hero h1 {
+  text-shadow: 0 1px 20px rgba(255, 255, 255, 0.55);
+}
+@media (max-width: 900px) {
+  .hero { background-position: center, center 30%; }
+}
+
+/* 导航里的绿单独调深：玻璃底不是纯白（实测约 rgb(212,211,211)），
+   #007354 在上面只有 3.93:1，不达标。这里只改导航语境，不动全局品牌色。 */
+.site-header .nav-links a.active,
+.site-header .nav-links a:hover,
+.site-header .member-toggle,
+.site-header #upload-entry {
+  color: #005538;
+}
+
+/* ================================================================== *
+ * 导航条：圆角矩形浮岛 + 真·Liquid Glass（折射）
+ *
+ * 之前的版本只有模糊和提亮 —— 那不是液态玻璃，是磨砂。
+ * 真正的做法是 feDisplacementMap：用一张位移贴图把背后的画面
+ * 在边缘处弯折（R 通道控横向、G 通道控纵向、128 中性），
+ * 模拟光线穿过玻璃棱边时的折射。贴图由 script.js 按实际尺寸生成。
+ *
+ * 该技术只在固定尺寸的圆角矩形/圆形上可靠，且 backdrop-filter 引用
+ * SVG 滤镜目前只有 Chromium 支持 —— 所以下面分两套：
+ *   支持时  → 折射版
+ *   不支持时 → 回落到模糊+提亮版（版式完全一致，只是没有弯折）
+ * ================================================================== */
+
+.glass-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.site-header {
+  position: fixed;
+  inset: auto;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  margin: 0;
+  justify-content: flex-start;
+  /* 圆角矩形，不是胶囊 —— 折射贴图也按这个半径生成 */
+  border: 0;
+  overflow: visible;
+  /* 回落：非 Chromium 用纯模糊 */
+  backdrop-filter: blur(14px) saturate(190%) brightness(1.28) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(190%) brightness(1.28) !important;
+}
+/* 折射由 script.js 逐元素挂载（每个玻璃面尺寸不同，要各自的位移贴图）。
+   #liquid-glass 现在只作模板被克隆，不再被直接引用 —— 它自身没有贴图。 */
+/* 顶部薄光顺着弧面滑下 */
+.site-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.34) 0%,
+    rgba(255, 255, 255, 0.07) 40%,
+    rgba(255, 255, 255, 0) 60%,
+    rgba(255, 255, 255, 0.09) 100%
+  );
+}
+.site-header::after { content: none; display: none; }
+.site-header > * { position: relative; z-index: 1; }
+
+/* 浮岛内的排布 */
+.site-header .nav-links { justify-content: flex-start; }
+.member-zone { flex: none; }
+.hero { padding-top: 122px; }
+
+@media (max-width: 900px) {
+  .site-header { width: calc(100vw - 28px); justify-content: space-between; }
+  .hero { padding-top: 100px; }
+}
+
+/* ================================================================== *
+ * 对照 liquid-glass-design skill 的收尾
+ * （该 skill 是 SwiftUI/UIKit 原生的，没有 Web 实现，
+ *   这里取的是它的原则与反模式清单。）
+ * ================================================================== */
+
+/* 2) 补 skill 里的 .interactive()：可交互的玻璃要响应指针。
+      只给真正可交互的元素，被动标签不加（skill 明确列为反模式：
+      「不要给所有东西都上玻璃，留给可交互元素、工具条、卡片」）。 */
+#back-to-top {
+  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1),
+              background 200ms ease, box-shadow 200ms ease;
+}
+#back-to-top:hover {
+  transform: scale(1.06);
+}
+#back-to-top:active { transform: scale(0.96); }
+
+/* 浮岛内的可交互项：指针经过时玻璃局部「亮一下」 */
+.site-header .nav-links a,
+.site-header .member-toggle,
+.site-header #upload-entry {
+  transition: background 180ms ease, color 180ms ease;
+}
+.site-header .nav-links a:active,
+.site-header .member-toggle:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  #back-to-top:hover, #back-to-top:active,
+  .site-header .nav-links a:active,
+  .site-header .member-toggle:active { transform: none; }
+}
+
+/* ================================================================== *
+ * 三处修正（对照 Apple 官方说法逐条改）
+ * ================================================================== */
+
+/* 1) 去掉文字白光晕。
+      Apple 的说法是「用填充、透明度和 vibrancy，让上层元素成为材质的一部分」，
+      可读性由材质本身（动态 tint 与明度范围）承担 ——
+      文档里没有「给文字加光晕/描边」这一项。之前那层白光晕是我自己加的，
+      看起来就是一圈生硬描边，不是 vibrancy。
+      去掉后靠加大材质本身的填充来补回对比度。 */
+.site-header .nav-links a,
+.site-header .brand strong,
+.site-header .member-toggle,
+.site-header #upload-entry {
+  text-shadow: none;
+}
+.site-header {
+  /* 材质承担可读性：填充加厚，明度范围再抬一点 */
+  background: rgba(255, 255, 255, 0.30);
+}
+.demo-badge {                        /* 实测偏 -0.63px */
+  padding-top: 6.32px;
+  padding-bottom: 5.68px;
+}
+
+/* ================================================================== *
+ * 形状修正：浮岛改成胶囊
+ *
+ * 对照 iOS 26 实拍：迷你播放器、标签栏、选中项、搜索按钮 —— 全是胶囊，
+ * 左右端是完整半圆（半径 = 高/2）。之前 54px 高配 22px 圆角（比值 0.41），
+ * 没到 0.5，所以看着是「生硬的圆角矩形」而不是胶囊。
+ * 这也和 liquid-glass-design skill 一致：.glassEffect() 形状默认 .capsule。
+ *
+ * 胶囊端头本就是半圆，所以 corner-shape 用 round 而不是 squircle
+ * （squircle 会把端头压扁，反而不对）。
+ * script.js 的折射贴图已同步按半径自动判定指数。
+ * ================================================================== */
+
+.site-header {
+  border-radius: 999px;
+}
+@supports (corner-shape: squircle) {
+  .site-header { corner-shape: round; }
+  /* 岛内的项也跟着变胶囊，和实拍里的 Library 选中态一致 */
+  .site-header .nav-links a,
+  .site-header .member-toggle,
+  .site-header #upload-entry { corner-shape: round; }
+}
+
+/* ================================================================== *
+ * 字重阶梯
+ *
+ * 问题：实测下来几乎所有层级都是 500 —— h2 42px 是 500、卡片标题 28px
+ * 也是 500、导航 12px 还是 500。字号拉开了，字重没拉开，所以不醒目。
+ *
+ * apple-design skill：「层级要靠字重 + 字号 + 行高一起建立，不能只靠字号」
+ *                     「用字重强调，不占额外空间」
+ *
+ * 阶梯（PingFang SC 的 600 = Semibold，是中文里最实用的强调档）：
+ *   400 正文、说明
+ *   500 次要标签
+ *   600 标题、导航、眼眉      ← 之前这一档整个缺失
+ * ================================================================== */
+
+/* 大标题：加重 + 收紧字距，字号越大字距越负（skill 的字距规则） */
+h1, .hero h1 {
+  font-weight: 700;
+  letter-spacing: -0.022em;
+}
+/* 区块标题：42px 配 500 太轻 */
+h2,
+.section-heading h2,
+.section-copy h2, .join-copy h2, .request-copy h2, .members-section h2 {
+  font-weight: 600;
+  letter-spacing: -0.016em;
+}
+/* 卡片标题 */
+h3,
+h4,
+.tile h3,
+.record-card h3,
+.platform-card h3,
+.group-card h4 {
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+.roster-card strong { font-weight: 600; }
+
+/* 小字标签：字号小反而更需要字重，否则在玻璃/照片上糊掉
+   （对照 iOS 26 实拍：标签栏文字很小，但是 semibold） */
+.eyebrow, .kicker, .panel-label {
+  font-weight: 600;
+  letter-spacing: 0.002em;
+}
+
+/* 导航：12px 中文偏小，提到 13px 并加到 600 */
+.site-header .nav-links a,
+.site-header .member-toggle,
+.site-header #upload-entry {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.006em;
+}
+.site-header .brand strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.008em;
+}
+
+/* 统计数字：本来就是视觉锚点，再加重一档 */
+.hero-rail strong { font-weight: 700; letter-spacing: -0.028em; }
+.hero-rail span { font-weight: 500; }
+
+/* 正文保持 400 —— 阶梯要有低点，否则「都重 = 都不重」 */
+body,
+p,
+li,
+.section-lede,
+.tile p,
+.roster-meta,
+.group-reason,
+.group-skills {
+  font-weight: 400;
+}
+/* 按钮文字略加重，胶囊里更立得住 */
+.button, .skill-chip { font-weight: 500; }
+.button.primary { font-weight: 600; }
+
+/* ================================================================== *
+ * 去色：所有硬编码的绿改成中性
+ * （令牌改了只覆盖一部分，rgba(0,115,84,…) 这类要单独处理）
+ * ================================================================== */
+
+/* 交互态填充 */
+.skill-drop.drop-active { background: rgba(0, 0, 0, 0.05); border-color: var(--accent); }
+.roster-skills span, .group-members span {
+  background: rgba(0, 0, 0, 0.055);
+  color: var(--text);
+}
+#skill-selected .skill-chip {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff;
+}
+.skill-ghost { background: var(--accent); border-color: var(--accent); color: #fff; }
+.group-warnings { background: rgba(0, 0, 0, 0.05); color: var(--text); border: 0; }
+
+/* 焦点环 */
+input:focus, select:focus, textarea:focus,
+.request-form input:focus, .join-form input:focus, .member-form input:focus,
+.modal form input:focus, .cas-grid input:focus {
+  outline-color: rgba(0, 0, 0, 0.28);
+}
+.button:focus-visible, .member-toggle:focus-visible, #upload-entry:focus-visible,
+.skill-chip:focus-visible, .nav-links a:focus-visible,
+#back-to-top:focus-visible, .modal-close:focus-visible { outline-color: var(--accent); }
+
+/* 按钮 */
+.button:hover, .member-toggle:hover, #upload-entry:hover { background: #000; }
+.button, .skill-chip { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important; }
+.button:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16) !important; }
+input[type="file"]::file-selector-button:hover { background: #000; }
+#back-to-top:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 10px 28px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 眼眉与统计数字：靠字号字重立住，不靠色相 */
+.eyebrow, .kicker, .panel-label { color: var(--text-muted); }
+.hero-rail strong { color: var(--text); }
+.button.ghost { color: var(--text); }
+.button.ghost:hover { color: #000; }
+
+/* ================================================================== *
+ * 导航改成分段控件（对照 iOS 分段控件实拍）
+ *
+ * 关键在比例：实拍里选中药丸的高度约为容器的 76%，只留很窄的内嵌边；
+ * 我原来是 57%（54px 容器里 31px 药丸），所以看着「小框太小」。
+ *
+ * 容器内边距 6px → 药丸 42px，占 78%，和实拍一致。
+ * 同心圆角：两者都是胶囊，天然平行。
+ * ================================================================== */
+
+.site-header {
+  height: 54px;
+  padding: 6px;
+  gap: 2px;
+}
+.site-header .nav-links {
+  flex: 0 1 auto;
+  gap: 2px;
+  height: 100%;
+}
+.site-header .nav-links a,
+.site-header .member-toggle,
+.site-header #upload-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;                 /* 容器 54 − 上下各 6 = 42，占 78% */
+  min-height: 0;
+  padding: 0 16px;
+  border-radius: 999px;
+  line-height: 1;
+  white-space: nowrap;
+}
+/* 未选中：透明，hover 时浮现浅底 */
+.site-header .nav-links a { background: transparent; color: var(--text); }
+.site-header .nav-links a:hover { background: rgba(0, 0, 0, 0.05); }
+/* 选中：填充药丸，和实拍一样几乎撑满容器 */
+.site-header .nav-links a.active {
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+/* 登录：中性实心，作为唯一的主动作 */
+.site-header .member-toggle,
+.site-header #upload-entry {
+  background: rgba(29, 29, 31, 0.9) !important;
+  color: #fff;
+  margin-left: 4px;
+}
+.site-header .member-toggle:hover,
+.site-header #upload-entry:hover {
+  background: #000 !important;
+  text-decoration: none;
+}
+.member-zone { gap: 6px; margin-left: 0; height: 100%; align-items: center; }
+
+/* 光学重心：药丸高度变了要重调（之前的补偿是按 31px 药丸算的） */
+.site-header .nav-links a,
+.site-header .member-toggle,
+.site-header #upload-entry {
+  padding-top: 1px;
+  padding-bottom: 0;
+}
+
+/* ================================================================== *
+ * 提示类文字统一成三档
+ *
+ * 实测原状裂成两档：13px 和 14px 混用。且技能框那句提示在框「内部」，
+ * 扮演 placeholder 的角色，却是 14px，比其它 placeholder（17px）小 3px。
+ *
+ * 三档，各自内部完全一致：
+ *   ① 字段标签（框外，在上方）   13px / 400 / #6e6e73
+ *   ② 框内提示（placeholder）    17px / 400 / #6e6e73
+ *   ③ 辅助说明与状态反馈          13px / 400 / #6e6e73
+ * ================================================================== */
+
+/* ① 字段标签 —— 本来就一致，这里固化，防止以后被别处改动 */
+.request-form label > span,
+.join-form label > span,
+.member-form label > span,
+.modal form label > span,
+.group-controls label > span,
+.cas-field legend,
+.mode-tabs legend {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* ② 框内提示：技能框的提示语和真正的 placeholder 同属一档 */
+::placeholder,
+.skill-hint {
+  font-size: 17px;
+  font-weight: 400;
+  color: #6e6e73;
+  opacity: 1;
+}
+.skill-hint { line-height: 1.4; margin: 0; }
+
+/* ③ 辅助说明与状态反馈 */
+.group-lede,
+.member-status,
+.group-status,
+.group-skills,
+.group-reason,
+.roster-meta {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* ================================================================== *
+ * 玻璃材质全站统一
+ *
+ * 之前只有导航条有折射，角标/回顶部/提示条都只是模糊 —— 材质不一致。
+ * 现在 script.js 给每个玻璃面按自身尺寸生成折射贴图。
+ *
+ * 这里做两件事：
+ *   1. 让开 !important，否则 CSS 会盖掉 JS 设的 backdrop-filter
+ *   2. 统一镜面边的语言：亮玻璃高光强、暗玻璃收敛，但结构相同
+ * ================================================================== */
+
+/* 支持折射时，把写死的 backdrop-filter 让给 JS（.glass-refract 由 JS 添加） */
+@supports (backdrop-filter: url(#liquid-glass)) {
+  .site-header.glass-refract,
+  .demo-badge.glass-refract,
+  #back-to-top.glass-refract,
+  .toast.glass-refract {
+    /* backdrop-filter 由 script.js 按元素写在 style 上，这里不再用 !important 覆盖 */
+    -webkit-backdrop-filter: revert-layer;
+  }
+}
+
+/* —— 镜面边：同一套结构，按明暗调强度 —— */
+/* 亮玻璃 */
+.site-header {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 2px 3px -2px rgba(0, 0, 0, 0.14),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.26),
+    0 8px 28px rgba(0, 0, 0, 0.13),
+    0 2px 6px rgba(0, 0, 0, 0.05) !important;
+}
+/* 暗玻璃：高光收敛（深色面上的反射本来就弱），结构一致 */
+.demo-badge,
+#back-to-top,
+.toast {
+  background: rgba(29, 29, 31, 0.5) !important;
+  color: #fff;
+  border: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 2px 4px -2px rgba(0, 0, 0, 0.3),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    0 6px 20px rgba(0, 0, 0, 0.24) !important;
+  text-shadow: none;
+}
+#back-to-top:hover { background: rgba(29, 29, 31, 0.7) !important; }
+
+/* 顶部薄光：所有玻璃面都有，强度随明暗 */
+.demo-badge::before,
+#back-to-top::before,
+.toast::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.20) 0%,
+    rgba(255, 255, 255, 0.04) 42%,
+    rgba(255, 255, 255, 0) 62%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+}
+.demo-badge, #back-to-top, .toast { position: fixed; overflow: hidden; }
+.demo-badge > *, #back-to-top > *, .toast > * { position: relative; z-index: 1; }
+
+/* ================================================================== *
+ * 滚动态的导航：只改「浮起感」，不改材质
+ * ------------------------------------------------------------------
+ * 原来 .site-header.scrolled 把底色换成不透明的 var(--surface)，
+ * 滚过 14px 之后玻璃就被整块盖住了（折射滤镜还挂着，但看不见）。
+ * Apple 的做法是滚动后加深阴影、微微加一点底色，材质本身不变。
+ * 这两条选择器权重 (0,2,0) 与旧规则相同，靠位置靠后取胜。
+ * ================================================================== */
+.site-header.scrolled {
+  /* 比页顶的 0.30 稍实一点，压住身后的照片，但仍然透 */
+  background: rgba(255, 255, 255, 0.42) !important;
+  border-color: rgba(255, 255, 255, 0.66);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.80),
+    inset 0 2px 3px -2px rgba(0, 0, 0, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 12px 36px rgba(0, 0, 0, 0.17),
+    0 3px 8px rgba(0, 0, 0, 0.07) !important;
+}
+
+/* ================================================================== *
+ * 全站区块统一居中
+ * ------------------------------------------------------------------
+ * 原本三种排版混在一起：
+ *   多数区块        .section-heading  已居中
+ *   events         .section-copy     两端对齐（眉标贴最左、标题贴最右）
+ *   request / join .strip 左右分栏    标题在左列、表单在右列
+ * 统一成一种：眉标 + 标题 + 说明 居中成一栏，内容在其下方居中。
+ * 卡片内部的正文保持左对齐 —— 多行中文居中会让每行起点参差，反而难读。
+ * ================================================================== */
+
+/* 1) events：两端对齐 → 居中栏 */
+.section-copy {
+  display: block;                    /* 原为 flex + space-between */
+  max-width: var(--w-wide);
+  margin: 0 auto 40px;
+  padding: 0;
+  border: 0;
+  text-align: center;
+}
+
+/* 2) request / join：左右分栏 → 单栏居中 */
+.request-section,
+.join {
+  display: block;
+}
+.request-copy,
+.join-copy {
+  position: static;                  /* 单栏下 sticky 失去意义 */
+  max-width: var(--w-wide);
+  margin: 0 auto 40px;
+  text-align: center;
+}
+
+/* 3) 三个标题栏共用的内部收敛 */
+.section-copy > *,
+.request-copy > *,
+.join-copy > * {
+  margin-inline: auto;
+}
+.section-copy h2,
+.request-copy h2,
+.join-copy h2 {
+  max-width: 900px;
+}
+.section-copy p:not(.eyebrow),
+.request-copy p:not(.eyebrow),
+.join-copy p:not(.eyebrow) {
+  max-width: 640px;
+}
+
+/* 4) 表单收窄居中，避免脱离分栏后被拉满整幅 */
+.request-form,
+.join-form {
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+/* ================================================================== *
+ * events / teams 收进正文栏宽
+ * ------------------------------------------------------------------
+ * 站内 6 个区块的内容区都是 --w-wide(1240px)，只有这两个撑满 1396px
+ * （视口减去 section 内边距），跟上方已居中的标题栏也对不齐。
+ * ================================================================== */
+.event-track,
+.team-layout {
+  max-width: var(--w-wide);
+  margin-inline: auto;
+}
+
+/* 活动卡：min-height 290px 比内容(219px)高出一截，底部空 71px。
+   压到 200px 当下限，让内容决定高度，等高由栅格保证。 */
+.event-track article {
+  min-height: 200px;
+}
+
+/* 分隔线去重影。
+   .event-track 的分隔线本来是靠 gap:1px 透出容器底色来画的，
+   但 styles.css:2045 那轮扁平化把 .event-track 和 .event-track article
+   写进了同一条规则，卡片也拿到了一整圈 1px 边框，于是：
+     卡间 = A 的右框 + 1px 间隙 + B 的左框  → 三层
+     外沿 = 容器框 + 卡片框                → 两层
+   去掉卡片边框，并把容器底色换成线色，让 gap 回到它该有的角色。 */
+.event-track article {
+  border: 0;
+}
+.event-track {
+  background: var(--border);
+}
+
+/* 倒角归入统一的半径梯度。
+   .team-card / .event-card 这两个类名在 index.html / app.js / script.js 里
+   出现 0 次 —— 早先的圆角与连续曲率规则全写给了不存在的选择器，
+   所以这两块一直停在 16px + round，是全站仅有的两个脱离梯度的面。
+   真实类名是 .team-panel 与 .event-track，尺寸(611x425 / 1240x239)
+   落在 --r-5 的「250–500px 卡片」档，与 .record-card / .board-panel 同级。 */
+.team-panel,
+.event-track {
+  border-radius: var(--r-5);
+}
+@supports (corner-shape: squircle) {
+  .team-panel,
+  .event-track {
+    corner-shape: squircle;
+  }
+}
+
+/* ================================================================== *
+ * 推拉式滚动 + 弹层动效
+ * ================================================================== */
+
+/* ---- 1) 区块推拉 ----------------------------------------------------
+ * 下面一个区块被拉上来，上面一个自己往上滑走。
+ * 用滚动驱动动画(animation-timeline: view())做，位置严格跟手指走，
+ * 不是定时动画，所以反向滚动会原路退回。
+ * section 内没有 sticky / fixed 元素，加 transform 是安全的（已核）。
+ * -------------------------------------------------------------------- */
+@keyframes sec-enter {
+  from { opacity: 0;   transform: translateY(52px) scale(0.988); }
+  to   { opacity: 1;   transform: none; }
+}
+@keyframes sec-leave {
+  from { opacity: 1;   transform: none; }
+  to   { opacity: 0.5; transform: translateY(-38px) scale(0.988); }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    main > section:not(.hero) {
+      /* sec-leave 必须用 forwards 而不是 both：
+         两个动画都写 transform/opacity，后者排在后面优先级更高，
+         若用 both，它在自己区间之前就会拿 from 关键帧(identity)
+         把 sec-enter 整个盖掉，入场那半就永远不显示。 */
+      animation: sec-enter linear both, sec-leave linear forwards;
+      animation-timeline: view(), view();
+      animation-range: entry 0% entry 90%, exit 10% exit 100%;
+    }
+  }
+}
+
+/* ---- 2) 滚到顶不再回弹 ----------------------------------------------
+ * hero 顶着照片，橡皮筋回弹会把 html 的白底露出来，成一条白带。
+ * -------------------------------------------------------------------- */
+html {
+  overscroll-behavior-y: none;
+}
+
+/* ---- 3) 照片合集：让空状态撑开栅格 ----------------------------------
+ * .gallery-grid 是瀑布流(grid-auto-rows:8px)，空状态卡片 93px 高却只
+ * 占 8px 的行，溢出到容器外，下内边距等于从 8px 算起 —— 白卡贴着灰边。
+ * 只在「栅格里只有空状态」时退回普通流，有照片时瀑布流照旧。
+ * -------------------------------------------------------------------- */
+.gallery-grid:has(> .empty-state:only-child) {
+  grid-auto-rows: auto;
+  grid-template-columns: 1fr;
+}
+.works {
+  padding-bottom: 132px;      /* 灰底在白卡下方留出更厚的一圈 */
+}
+
+/* ---- 4) 时间线图块：按下时照片自己涨一点 ----------------------------- */
+.timeline-list article.tile { cursor: pointer; }
+.timeline-list article.tile > .tile-img {
+  transition: transform 640ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.timeline-list article.tile:hover > .tile-img { transform: scale(1.035); }
+.timeline-list article.tile:active > .tile-img {
+  transform: scale(1.07);
+  transition-duration: 240ms;
+}
+
+/* ---- 5) 灯箱：补上过渡 -----------------------------------------------
+ * 原本 display:none → display:grid，中间没有任何过渡，点开是硬切。
+ * allow-discrete 让 display 参与过渡，@starting-style 提供入场初值。
+ * -------------------------------------------------------------------- */
+.lightbox {
+  opacity: 0;
+  transition:
+    opacity 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    display 280ms allow-discrete;
+}
+.lightbox.is-open { opacity: 1; }
+@starting-style {
+  .lightbox.is-open { opacity: 0; }
+}
+.lightbox img {
+  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lightbox.is-open img { transform: none; }
+@starting-style {
+  .lightbox.is-open img { transform: scale(0.9); }
+}
+
+/* ---- 6) 弹窗：去掉逐帧模糊 -------------------------------------------
+ * 原 materialize 在 260ms 内同时动 filter: blur(8px)。模糊每帧都要重算，
+ * 是这段动画发僵的主因。改成只动透明度和位移，时长放长、尾段更缓。
+ * -------------------------------------------------------------------- */
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.93) translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.modal.is-open .modal-card {
+  animation: modal-pop 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ================================================================== *
+ * 英文字号 / 剩余居中 / 背景照片 / 载入动效
+ * ================================================================== */
+
+/* ---- 1) 英文眉标放大一档 --------------------------------------------
+ * 原来 13px/600，在 58px 的中文大标题旁边太轻，站不住。
+ * -------------------------------------------------------------------- */
+.eyebrow {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.record-card > span {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+/* ---- 2) B 站区：标题栏与卡片都归中 ----------------------------------
+ * .section-heading 仍是 flex + space-between（styles.css:324），
+ * 所以「B站主页占位」被甩到最右，标题也被挤得不正。
+ * .video-grid 写死 repeat(3,...) 但只有 2 张卡，两张挤在左边。
+ * -------------------------------------------------------------------- */
+.section-heading {
+  display: block;
+}
+/* .section-heading 比其他标题栏多一层 <div> 包裹，
+   所以要连孙元素一起收，否则 h2 的 max-width:780px 会靠左停住。 */
+.section-heading > *,
+.section-heading > div > * {
+  margin-inline: auto;
+}
+.section-heading .button {
+  display: inline-flex;
+  margin-top: 20px;
+}
+.video-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 400px));
+  justify-content: center;
+}
+
+/* ---- 3) 背景照片打底 -------------------------------------------------
+ * 隔几个区块垫一张活动照，上面盖一层同色渐变把对比度压回来。
+ * 越往下越透，让照片在区块底部「浮出来」一点，不做成满幅大图。
+ * 只挑了 3 个（申请 / 照片合集 / 加入），刻意留白其余区块。
+ * -------------------------------------------------------------------- */
+/* 选择器必须用 ID：styles.css:2444 的
+   `#workspace, #library, #works, #teams, #join { background: var(--surface) }`
+   是 ID 权重 (1,0,0)，而且 background 简写会把 background-image 重置成 none。
+   用 .works / .join 这类 class (0,1,0) 写在后面也压不过它。 */
+#request,
+#works,
+#join {
+  background-repeat: no-repeat, no-repeat;
+  background-size: auto, cover;
+  background-attachment: scroll, scroll;
+}
+#request {
+  background-position: center, center 30%;
+}
+#works {
+  background-position: center, center 36%;
+}
+#join {
+  background-position: center, center 34%;
+}
+
+/* ---- 4) 刷新页面的入场 ----------------------------------------------
+ * 只给首屏三层做，错开 90ms 依次滑入。
+ * 注意导航条本身带 translateX(-50%) 居中，关键帧里必须原样带上，
+ * 否则动画会把居中的位移覆盖掉，导航会跑偏。
+ * -------------------------------------------------------------------- */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes header-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-14px); }
+  to   { opacity: 1; transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .site-header  { animation: header-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .hero-content { animation: page-in 860ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both; }
+  .hero-rail    { animation: page-in 860ms cubic-bezier(0.22, 1, 0.36, 1) 210ms both; }
+}
+
+/* ================================================================== *
+ * 接缝 + 照片可见度
+ * ================================================================== */
+
+/* ---- 1) 去掉区块之间那条细线 ----------------------------------------
+ * .strip 从旧毛玻璃样式带下来一条 border-block: 1px rgba(255,255,255,.58)，
+ * styles.css:2086 那轮只覆盖了背景、没动边框。半透明白线压在灰底或照片上
+ * 就是「一小串、一条线」的来源。四个 .strip 区块都有。
+ * -------------------------------------------------------------------- */
+.strip {
+  border-block: 0;
+}
+
+/* ---- 2) 照片压得更少，靠加重文字换出余量 ----------------------------
+ * 遮罩之所以必须压到 0.98，是因为眉标 #6e6e73 在纯白上只有 4.87:1，
+ * 几乎没有余量。先把照片区的说明文字加重到 #3f3f44（纯白上 10.9:1），
+ * 遮罩就能大幅降下来，照片才看得见。
+ * -------------------------------------------------------------------- */
+#request .eyebrow, #works .eyebrow, #join .eyebrow,
+#request .request-copy p, #join .join-copy p {
+  color: #3f3f44;
+}
+
+#request {
+  background-image:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.90) 0%,
+      rgba(255, 255, 255, 0.84) 52%,
+      rgba(255, 255, 255, 0.66) 100%),
+    url("assets/events/recruitment-booth-music.webp");
+}
+#works {
+  background-image:
+    linear-gradient(180deg,
+      rgba(245, 245, 247, 0.92) 0%,
+      rgba(245, 245, 247, 0.85) 54%,
+      rgba(245, 245, 247, 0.64) 100%),
+    url("assets/events/figaro-stage.webp");
+}
+#join {
+  background-image:
+    linear-gradient(180deg,
+      rgba(245, 245, 247, 0.92) 0%,
+      rgba(245, 245, 247, 0.86) 56%,
+      rgba(245, 245, 247, 0.62) 100%),
+    url("assets/events/orchestra-rehearsal.webp");
+}
+
+/* ---- 3) 照片上的表单卡改成玻璃 --------------------------------------
+ * 玻璃只有在背后有内容时才成立。这两张卡现在压在活动照片上，
+ * 是全站唯二适合上折射的大面（其余区块背后是纯色，上玻璃等于白做）。
+ * 选择器要带 ID：styles.css:2510 的 `#join .join-form{background:#fff}`
+ * 是 (1,1,0)，class 压不过。
+ * -------------------------------------------------------------------- */
+#request .request-form,
+#join .join-form {
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.44),
+    /* 底部往上的内阴影 = 玻璃厚度，取自 you-want/liquid-glass */
+    inset 0 -10px 25px rgba(0, 0, 0, 0.07),
+    0 12px 40px rgba(0, 0, 0, 0.10),
+    0 2px 8px rgba(0, 0, 0, 0.05);
+}
+/* 玻璃上的输入框：不能用白底 —— 卡片本身就是近白的玻璃，
+   白底会让框和卡完全同色（实测通道差 0，框整个消失）。
+   改成浅色凹陷填充 + 发丝内环：环负责划边界，填充保持够浅，
+   以免把 placeholder(#6e6e73) 的对比度压到 4.5:1 以下。 */
+#request .request-form input,
+#request .request-form select,
+#request .request-form textarea,
+#join .join-form input,
+#join .join-form select,
+#join .join-form textarea {
+  background: rgba(60, 60, 67, 0.045);
+  /* 必须带 important：styles.css:3000 有 input,select,textarea{box-shadow:none!important} */
+  box-shadow: inset 0 0 0 1px rgba(60, 60, 67, 0.18) !important;
+}
+#request .request-form input:focus,
+#request .request-form select:focus,
+#request .request-form textarea:focus,
+#join .join-form input:focus,
+#join .join-form select:focus,
+#join .join-form textarea:focus {
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.30) !important;
+}
+
+/* ================================================================== *
+ * 可访问性兜底 —— 必须留在文件最末
+ * ------------------------------------------------------------------
+ * 上面的玻璃规则用了 !important，同权重下后写的胜出，
+ * 所以这段一旦不在末尾就会失效。新增玻璃样式请写在这段之前。
+ * ================================================================== */
+@media (prefers-reduced-transparency: reduce) {
+  .site-header,
+  .site-header.scrolled,
+  .site-header.glass-refract,
+  .demo-badge,
+  #back-to-top,
+  .toast,
+  .modal {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .site-header,
+  .site-header.scrolled,
+  .site-header.glass-refract {
+    background: #fbfbfd !important;
+    border: 1px solid rgba(0, 0, 0, 0.10) !important;
+  }
+  .site-header::before { display: none !important; }
+  .demo-badge::before, #back-to-top::before, .toast::before { display: none !important; }
+  .demo-badge, #back-to-top { background: #1d1d1f !important; }
+  .toast { background: #1d1d1f !important; }
+  .modal { background: rgba(0, 0, 0, 0.62) !important; }
+}
+
+/* 上面那批动效规则写在 styles.css:3219 的 reduced-motion 覆盖之后，
+   同权重下后写的胜出，所以这里必须再声明一次。本段同样要留在文件末尾。 */
+@media (prefers-reduced-motion: reduce) {
+  main > section:not(.hero) { animation: none !important; }
+  .modal.is-open .modal-card { animation: none !important; }
+  .lightbox, .lightbox img,
+  .timeline-list article.tile > .tile-img { transition: none !important; }
+  .timeline-list article.tile:hover > .tile-img,
+  .timeline-list article.tile:active > .tile-img { transform: none !important; }
+  .hero-content, .hero-rail { animation: none !important; }
+  .site-header { animation: none !important; }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "oao-photography-proxy",
+  "version": "1.0.0",
+  "description": "OAO 摄影社 · 飞书多维表格代理（Cloudflare Pages Functions / 腾讯云函数 SCF 通用）",
+  "main": "index.js",
+  "scripts": {
+    "start": "node dev-server.js",
+    "test": "node test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}

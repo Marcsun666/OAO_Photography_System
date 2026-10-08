@@ -1,0 +1,9 @@
+.wrangler/
+node_modules/
+.dev.vars
+*.env
+.env*
+assets-originals/
+assets/media/
+__pycache__/
+*.pyc
