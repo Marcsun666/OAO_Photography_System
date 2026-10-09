@@ -1,8 +1,8 @@
 # 交接说明 · OAO 摄影社活动记录站
 
-> **2026-10-08 · v2 已上线：最新、权威的交接文档是 [`HANDOVER-v2.md`](HANDOVER-v2.md)（英文，自包含）。**
+> **2026-10-08 · v2 已上线：最新、权威的交接文档是 [`HANDOVER-v3.md`](HANDOVER-v3.md)（英文，自包含）。**
 > 后端现在跑在 Cloudflare Pages Functions（不是腾讯云），站点已是数据驱动模式（`demo: false`）。
-> 本文以下内容是 v1 阶段的历史记录与设计说明，与 HANDOVER-v2.md 冲突时以 HANDOVER-v2.md 为准。
+> 本文以下内容是 v1 阶段的历史记录与设计说明，与 HANDOVER-v3.md 冲突时以 HANDOVER-v3.md 为准。
 
 
 > 给接手这个站的同学。**先读这份，再读 `README.md` / `SETUP.md` / `PLAN.md`。**

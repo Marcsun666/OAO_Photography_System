@@ -1,9 +1,9 @@
-# OAO Photography Club (OAO 摄影社) website: v2 handover
+# OAO Photography Club (OAO 摄影社) website: v3 handover
 
-> **Version:** v2, with a live backend. Snapshot taken 2026-10-08.
+> **Version:** v3 (style refinement on top of the v2 live backend). **Live in production since 2026-10-09** (Cloudflare deployment `0d0d5be2`). v2 is kept for rollback (tag/branch `v2`, Cloudflare deployment `7fdceb9d-4d26-4711-bc9b-cc9b993579c7`).
 > **Live URL:** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
-> **Source:** the `OAO-Photography-v2-source.zip` that came with this file. It is also backed up in the private GitHub repo `Marcsun666/OAO_Photography_System` (tag `v2`; see §11).
-> **v3 status (2026-10-08):** v3 is a style refinement. It is deployed as a **preview only** at <https://v3.oao-photography.pages.dev> (git branch `v3`). Production is still v2. See §16 for the promote and rollback steps.
+> **Source:** the private GitHub repo `Marcsun666/OAO_Photography_System`: `main` and tag `v3` are the live version; tag/branch `v2` is the previous version (see §11). The older `OAO-Photography-v2-source.zip` contains v2 only.
+> **v3 status (2026-10-09):** v3 is **live in production** at <https://oao-photography.pages.dev>. The old preview at <https://v3.oao-photography.pages.dev> is no longer needed. See §16 for what changed and how to roll back to v2.
 > **Language:** this doc is in English. Chinese UI text and Feishu table/field names are quoted exactly. Never translate them in code.
 
 ---
@@ -133,7 +133,7 @@ The owner knows the **site password** and the **member passcode**. Neither is wr
 ```
 README.md                        short pointer to this file
 .gitignore                       .wrangler, node_modules, .dev.vars, *.env, assets-originals, assets/media, …
-OAO-Photography-v2-HANDOVER.md   this file (copy also at source/HANDOVER-v2.md)
+OAO-Photography-v3-HANDOVER.md   this file (copy also at source/HANDOVER-v3.md)
 feishu-tables.json               Base app_token + table ids + field list (no secrets)
 deploy/                          exactly what was deployed to Cloudflare Pages for v2 (built by tools/build-deploy.sh)
 source/
@@ -167,8 +167,8 @@ source/
 ├─ integration.test.js checks DOM ids, that `F` matches in app.js and cloud-function/index.js, and field names in SETUP.md
 ├─ design.test.js      colour-contrast and CSS brace-balance checks
 ├─ SETUP.md            (Chinese) Feishu setup + backend setup: 2A Cloudflare (current), 2B Tencent SCF
-├─ HANDOVER.md         (Chinese) long v1 history and design notes; points to HANDOVER-v2.md
-├─ HANDOVER-v2.md      copy of this file
+├─ HANDOVER.md         (Chinese) long v1 history and design notes; points to HANDOVER-v3.md
+├─ HANDOVER-v3.md      copy of this file
 ├─ README.md           (Chinese) overview; partly outdated (mentions Tencent as the middle layer)
 ├─ PLAN.md             (Chinese) the original plan; historical
 │
@@ -488,7 +488,7 @@ Use this only if needed. It requires Tencent real-name verification, which the o
   - Middleware returns JSON 401 for `/api` and blocks `/cloud-function/*`.
   - Added `tools/feishu/*` and `tools/build-deploy.sh`; SETUP.md has the 2A/2B sections.
   - Verified end to end: every route, uploads of 676 B, 3.3 MB and 8 MB with byte-identical download, one real DeepSeek call, and headless Chrome showing live data with no demo badge.
-- **v3: style and flow refinement**, 2026-10-08. **Preview only** until the owner approves it. See §16.
+- **v3: style and flow refinement**, 2026-10-08 to 2026-10-09. Three review rounds on a preview, then approved by the owner and **promoted to production on 2026-10-09** (deployment `0d0d5be2`; git `main` fast-forwarded to `v3`, tag `v3`). See §16.
 
 ---
 
@@ -528,12 +528,12 @@ Also: in `cd source/tools/feishu`, run `python3 verify.py`. It should end with `
 
 ---
 
-## 16. v3: style refinement (preview), promote and rollback
+## 16. v3: style refinement (LIVE), history and rollback
 
-**Status:** v3 is deployed to the Cloudflare Pages **preview** branch `v3`. Production (`main`) is still v2, deployment `7fdceb9d-4d26-4711-bc9b-cc9b993579c7`.
+**Status:** v3 is **live in production** (`main`, deployment `0d0d5be2`, promoted 2026-10-09 after the owner approved round 3). The previous production deployment, v2, is `7fdceb9d-4d26-4711-bc9b-cc9b993579c7`, kept for rollback (§16.4).
 
-- Preview URL: <https://v3.oao-photography.pages.dev>. It uses the same site password as production.
-- Git: branch `v3` in `Marcsun666/OAO_Photography_System`. `main`, tag `v2` and branch `v2` are unchanged.
+- The old preview URL <https://v3.oao-photography.pages.dev> still exists behind the same password but is no longer needed. Use the production URL.
+- Git: `main` and tag `v3` in `Marcsun666/OAO_Photography_System` are the live code. Tag `v2` and branch `v2` keep the previous version.
 - Backend, API routes, Feishu schema and `config.js` are **unchanged**. v3 only touches `index.html`, `styles.css`, `app.js`, `script.js` and the login page HTML/CSS inside `functions/_middleware.js`. The login logic is unchanged.
 
 ### 16.1 Preview environment secrets
@@ -710,7 +710,7 @@ The owner asked for:
 
 Screenshots are in `/workspace/v3-shots/r3/`.
 
-### 16.3 Promote v3 to production (only after the owner approves)
+### 16.3 Redeploy v3 to production (done on 2026-10-09; use this to redeploy)
 
 Production secrets are already set, so no secret changes are needed.
 
@@ -720,7 +720,7 @@ cd /workspace/oao-deploy-v3        # or: bash tools/build-deploy.sh <dir> from t
 rm -rf .wrangler && wrangler pages deploy . --project-name oao-photography --branch main --commit-dirty=true
 ```
 
-Then, optionally, merge or fast-forward git `main` to `v3`.
+Git `main` was fast-forwarded to `v3` and tagged `v3` on 2026-10-09.
 
 ### 16.4 Roll back to v2
 
@@ -740,7 +740,7 @@ v2 and v3 use the same API, secrets and Feishu data, so rolling back in either d
 ### 16.5 Known v3 notes
 
 - The preview shares production's Feishu data, so test submissions are real and must be deleted by hand.
-- Bottom sheets and the tab bar were tested in headless Chrome at 390px and 1280px. Check them on a real iPhone (Safari) before promoting.
+- Bottom sheets and the tab bar were tested in headless Chrome and WebKit (iPhone 14 emulation) at 390px and 1280px. A check on a real iPhone is still worth doing.
 - As of r2, the scroll reveal runs on `IntersectionObserver` and works in Safari/iOS, which the WebKit test confirmed. The v3 note in §16.2 about `animation-timeline` is superseded.
 - SVG refraction is off by default as of r2 (see §16.2b).
 
