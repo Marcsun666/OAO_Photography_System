@@ -1,8 +1,8 @@
 # OAO Photography Club (OAO 摄影社) website: v4 handover
 
-> **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09): PREVIEW ONLY** at <https://v4.oao-photography.pages.dev> (Cloudflare Pages branch `v4`, git branch `v4`). **Production is still v3** (deployment `0d0d5be2`, git `main` / tag `v3`) until the owner approves. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
-> **Live URL (v3 until promotion):** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
-> **Source:** the private GitHub repo `Marcsun666/OAO_Photography_System`: branch `v4` = this version; `main` and tag `v3` = live v3; tag/branch `v2` = older (see §11).
+> **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09): LIVE in production** at <https://oao-photography.pages.dev> (Cloudflare deployment `522b752c`, git `main` / tag `v4`). The v4 preview remains at <https://v4.oao-photography.pages.dev> (Pages branch `v4`). **Rollback:** v3 deployment `0d0d5be2` (git tag `v3`); see §17.8. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
+> **Live URL (v4 since 2026-10-09):** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
+> **Source:** the private GitHub repo `Marcsun666/OAO_Photography_System`: `main` and tag `v4` = this version (live); tag `v3` = previous production (rollback); tag/branch `v2` = older (see §11).
 > **Language:** this doc is in English. Chinese UI text and Feishu table/field names are quoted exactly. Never translate them in code.
 
 ---
@@ -752,7 +752,7 @@ v2 and v3 use the same API, secrets and Feishu data, so rolling back in either d
 
 ---
 
-## 17. v4 (PREVIEW at https://v4.oao-photography.pages.dev, not yet in production)
+## 17. v4 (LIVE in production since 2026-10-09, deployment `522b752c`; preview at https://v4.oao-photography.pages.dev)
 
 ### 17.1 What the owner asked for and what was built
 
@@ -827,7 +827,7 @@ python3 -c 'import secrets;print(secrets.token_urlsafe(32),end="")' | wrangler p
 # optional: AI_MONTHLY_CAP_CNY (default 20), AI_STOP_AT_CNY (default 18). ALLOWED_ORIGIN stays https://oao-photography.pages.dev
 ```
 
-### 17.7 Promote v4 to production (only after the owner approves)
+### 17.7 Promote v4 to production (done on 2026-10-09 after owner approval: deployment `522b752c`, git `main` fast-forwarded to `v4`, tag `v4`)
 
 ```bash
 export PATH=/home/box/.local/bin:/home/box/.local/node-v22.11.0-linux-x64/bin:$PATH WRANGLER_CACHE_DIR=/tmp/wcache
