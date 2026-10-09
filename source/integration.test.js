@@ -31,7 +31,7 @@ const htmlIds = new Set();
   let m;
   while ((m = re.exec(html))) htmlIds.add(m[1]);
 }
-for (const file of ["app.js", "script.js"]) {
+for (const file of ["app.js", "script.js", "events.js"]) {
   for (const id of referencedIds(file)) {
     assert.ok(htmlIds.has(id), file + ' 引用了缺失的 id="' + id + '"');
   }
@@ -54,6 +54,25 @@ function extractF(code, marker) {
 const fFront = extractF(read("app.js"), "var F = {");
 const fBack = extractF(read("cloud-function/index.js"), "const F = {");
 assert.deepStrictEqual(fFront, fBack, "前后端字段名常量不一致");
+
+/* 2b) v4 新表字段：后端用到的每个字段名都必须在 tools/feishu/schema.py 里建过 */
+{
+  const code = read("cloud-function/index.js");
+  const start = code.indexOf("Object.assign(F, {");
+  assert.ok(start >= 0, "未找到 v4 字段常量");
+  const block = code.slice(start, code.indexOf("\n});", start));
+  const schema = read("tools/feishu/schema.py");
+  const re = /(\w+):\s*"([^"]+)"/g;
+  let mm, n = 0;
+  while ((mm = re.exec(block))) {
+    n++;
+    assert.ok(schema.includes('"' + mm[2] + '"'), "schema.py 缺少 v4 字段「" + mm[2] + "」");
+  }
+  assert.ok(n >= 30, "v4 字段常量应有 30+ 项，实际 " + n);
+  for (const t of ["拍摄任务", "报名与交付", "AI用量", "TABLE_EVENTS", "TABLE_APPLICATIONS", "TABLE_AI_USAGE"]) {
+    assert.ok(schema.includes(t), "schema.py 缺少 " + t);
+  }
+}
 
 /* 3) 文档字段名 */
 const setup = read("SETUP.md");

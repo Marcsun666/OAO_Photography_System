@@ -7,7 +7,10 @@
     "TABLE_PHOTOS": "tblHR1Pm4DzDPX2n",
     "TABLE_LINKS": "tblP3MUlzdHPDoMb",
     "TABLE_MEMBERS": "tblIOuQufdKJ8JaG",
-    "TABLE_GROUPS": "tblROKlxEP0058Rj"
+    "TABLE_GROUPS": "tblROKlxEP0058Rj",
+    "TABLE_EVENTS": "tbliKFLeS4KfLGKO",
+    "TABLE_APPLICATIONS": "tblzwdHHFJNRm1eA",
+    "TABLE_AI_USAGE": "tblhaJ6i2hU8bWo1"
   },
   "tables": {
     "活动记录": {
@@ -242,6 +245,202 @@
         {
           "name": "说明",
           "type": "text",
+          "primary": false
+        }
+      ]
+    },
+    "拍摄任务": {
+      "env_var": "TABLE_EVENTS",
+      "table_id": "tbliKFLeS4KfLGKO",
+      "fields": [
+        {
+          "name": "名称",
+          "type": "text",
+          "primary": true
+        },
+        {
+          "name": "类别",
+          "type": "single_select",
+          "primary": false,
+          "options": [
+            "篮球",
+            "足球",
+            "匹克球",
+            "乒乓球",
+            "长绳",
+            "文化周",
+            "其他"
+          ]
+        },
+        {
+          "name": "日期",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "时间",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "地点",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "需要人数",
+          "type": "number",
+          "primary": false
+        },
+        {
+          "name": "状态",
+          "type": "single_select",
+          "primary": false,
+          "options": [
+            "开放报名",
+            "已安排",
+            "已结束",
+            "已取消"
+          ]
+        },
+        {
+          "name": "备注",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "种子键",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "来源申请",
+          "type": "text",
+          "primary": false
+        }
+      ]
+    },
+    "报名与交付": {
+      "env_var": "TABLE_APPLICATIONS",
+      "table_id": "tblzwdHHFJNRm1eA",
+      "fields": [
+        {
+          "name": "成员姓名",
+          "type": "text",
+          "primary": true
+        },
+        {
+          "name": "学号",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "任务ID",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "任务名称",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "状态",
+          "type": "single_select",
+          "primary": false,
+          "options": [
+            "已报名",
+            "已确认",
+            "已交付",
+            "已验收",
+            "已退回",
+            "已取消"
+          ]
+        },
+        {
+          "name": "百度网盘链接",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "提取码",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "描述",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "AI文案",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "报名时间",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "提交时间",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "管理备注",
+          "type": "text",
+          "primary": false
+        }
+      ]
+    },
+    "AI用量": {
+      "env_var": "TABLE_AI_USAGE",
+      "table_id": "tblhaJ6i2hU8bWo1",
+      "fields": [
+        {
+          "name": "键",
+          "type": "text",
+          "primary": true
+        },
+        {
+          "name": "月份",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "功能",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "调用次数",
+          "type": "number",
+          "primary": false
+        },
+        {
+          "name": "输入tokens",
+          "type": "number",
+          "primary": false
+        },
+        {
+          "name": "输出tokens",
+          "type": "number",
+          "primary": false
+        },
+        {
+          "name": "费用元",
+          "type": "number",
+          "primary": false
+        },
+        {
+          "name": "当日",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "当日次数",
+          "type": "number",
           "primary": false
         }
       ]

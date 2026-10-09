@@ -144,7 +144,8 @@
     const pos = (window.scrollY || 0) + 140;
     let current = navLinks[0];
     spySections.forEach((sec, i) => {
-      if (sec && sec.offsetTop <= pos) current = navLinks[i];
+      // v4：隐藏的区块（未开启的管理后台）offsetTop 为 0，不能参与高亮
+      if (sec && !sec.hidden && sec.offsetTop <= pos) current = navLinks[i];
     });
     // v3：手机底部标签栏跟着高亮（首屏 hero 时不高亮任何一项）
     const href = (window.scrollY || 0) > 240 ? current.getAttribute("href") : "";

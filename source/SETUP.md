@@ -104,6 +104,16 @@ AI 自动分组的结果留档，**每组一行**，同一次分组的几行用�
 
 > 留档的意义在于**结果能在飞书里人工调整**——AI 出初稿，人拍板。
 
+#### 表 6–8（v4 新增）：`拍摄任务` / `报名与交付` / `AI用量`
+
+字段以 `tools/feishu/schema.py` 为准（与 `cloud-function/index.js` 的 `F.event / F.app / F.usage` 一一对应）。最省事的做法：
+
+```bash
+cd tools/feishu && python3 setup_tables.py && python3 seed_events.py
+```
+
+对应环境变量：`TABLE_EVENTS`、`TABLE_APPLICATIONS`、`TABLE_AI_USAGE`。另外 v4 需要 `ADMIN_PASSCODE`（管理员口令，在「成员登录」框里输入）和 `ADMIN_TOKEN`（随机串）；可选 `AI_MONTHLY_CAP_CNY`（默认 20）和 `AI_STOP_AT_CNY`（默认 18）。**没有 `TABLE_AI_USAGE` 时所有 AI 功能（含 AI 分组）都会拒绝调用**——这是预算硬上限的一部分。
+
 ### 1.4 拿 app_token 和 table_id
 
 打开多维表格，看浏览器地址栏：

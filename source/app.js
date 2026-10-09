@@ -39,6 +39,7 @@
 
   var state = {
     token: sessionStorage.getItem("oao_token") || "",
+    role: sessionStorage.getItem("oao_role") || "",
     activities: [],
     photos: [],
     links: [],
@@ -290,13 +291,25 @@
     if (toggle) toggle.textContent = state.token ? "退出登录" : "成员登录";
     if (entry) entry.hidden = !state.token;
     // v3：成员工作区按登录态切换（锁定提示 / 快捷操作）
-    if (document.body && document.body.classList) document.body.classList.toggle("is-member", !!state.token);
+    if (document.body && document.body.classList) {
+      document.body.classList.toggle("is-member", !!state.token);
+      document.body.classList.toggle("is-admin", !!state.token && state.role === "admin");
+    }
+  }
+
+  /* v4：登录态变化广播给 events.js（日历 / 我的任务 / 管理后台） */
+  function emitAuth() {
+    if (typeof window.CustomEvent !== "function" || !document.dispatchEvent) return;
+    document.dispatchEvent(new window.CustomEvent("oao:auth", { detail: { token: state.token, role: state.role } }));
   }
 
   function logout() {
     state.token = "";
+    state.role = "";
     sessionStorage.removeItem("oao_token");
+    sessionStorage.removeItem("oao_role");
     updateMemberUI();
+    emitAuth();
     loadMembers();
     toast("已退出登录");
   }
@@ -318,12 +331,15 @@
         .then(function (res) {
           if (res.ok && res.token) {
             state.token = res.token;
+            state.role = res.role === "admin" ? "admin" : "member";
             sessionStorage.setItem("oao_token", res.token);
+            sessionStorage.setItem("oao_role", state.role);
             closeModal(modal);
             form.reset();
-            toast("登录成功，成员工作区已解锁");
+            toast(state.role === "admin" ? "管理员模式已开启 · 管理后台已解锁" : "登录成功，成员工作区已解锁");
             updateMemberUI();
             loadMembers();
+            emitAuth();
             runPendingAction();
           } else {
             status.textContent = res.msg || "口令不正确";
@@ -473,7 +489,7 @@
     ["sports-track-start", "运动会 · 起跑", "运动会"],
     ["orchestra-conductor", "管弦乐团 · 指挥", "舞台"],
     ["recruitment-booth-music", "社团招新现场", "招新"],
-    ["auto-flame-test", "汽车社 · 实验", "联动"],
+    ["physics-week-flame-test", "物理社 · 物理周", "实验"],
     ["volunteer-day-campus", "志愿者日", "校园"],
     ["relay-runner", "接力赛", "运动会"]
   ];
@@ -593,10 +609,13 @@
   }
 
   var pendingAction = null;
+  var pendingFn = null;
   function runPendingAction() {
-    var a = pendingAction;
+    var a = pendingAction, fn = pendingFn;
     pendingAction = null;
+    pendingFn = null;
     if (a) doAction(a);
+    if (fn) setTimeout(fn, 380);
   }
 
   function doAction(action) {
@@ -1029,6 +1048,26 @@
         .then(function () { btn.disabled = false; });
     });
   }
+
+  /* v4：给 events.js 用的小桥（同一套 api / 登录态 / 弹窗 / toast） */
+  window.OAO = {
+    api: api,
+    esc: esc,
+    toast: toast,
+    openModal: openModal,
+    closeModal: closeModal,
+    token: function () { return state.token; },
+    role: function () { return state.role; },
+    demo: DEMO,
+    connected: CONNECTED,
+    members: function () { return state.members; },
+    /* 需要成员身份：已登录直接执行；否则弹登录框，登录成功后接着执行 */
+    requireMember: function (fn) {
+      if (state.token || DEMO) { fn(); return; }
+      pendingFn = fn;
+      openModal(el("#login-modal"));
+    },
+  };
 
   /* ---------------------------- 初始化 ---------------------------- */
   function init() {

@@ -1,0 +1,214 @@
+/**
+ * v4 离线测试：日历 / 报名 / 交付 / 管理员鉴权 / AI 预算守卫
+ * 用一个内存版「飞书」+ 假 DeepSeek，不连任何真实服务。
+ * 运行：node v4.test.js
+ */
+"use strict";
+const assert = require("assert");
+
+const ENV = {
+  FEISHU_APP_ID: "cli_test", FEISHU_APP_SECRET: "s", BITABLE_APP_TOKEN: "app",
+  TABLE_ACTIVITIES: "tbl_act", TABLE_PHOTOS: "tbl_photo", TABLE_LINKS: "tbl_link", TABLE_MEMBERS: "tbl_mem",
+  TABLE_EVENTS: "tbl_ev", TABLE_APPLICATIONS: "tbl_app", TABLE_AI_USAGE: "tbl_ai",
+  MEMBER_PASSCODE: "member-pass", MEMBER_TOKEN: "member-token",
+  ADMIN_PASSCODE: "admin-pass", ADMIN_TOKEN: "admin-token",
+  LLM_API_KEY: "sk-test",
+};
+
+/* —— 内存飞书 —— */
+let seq = 0;
+const db = { tbl_act: [], tbl_photo: [], tbl_link: [], tbl_mem: [], tbl_ev: [], tbl_app: [], tbl_ai: [] };
+const add = (t, fields) => { const r = { record_id: "rec" + (++seq).toString(36) + "X", fields }; db[t].push(r); return r; };
+const day = (offset) => { const d = new Date(Date.now() + 8 * 3600e3 + offset * 86400e3); return d.toISOString().slice(0, 10); };
+
+add("tbl_act", { 活动名称: "Test", 日期: "2026.10.08 12:00", 描述: "Test\nCAS：C 1 / A 0 / S 1", 状态: "待选片" });
+add("tbl_act", { 活动名称: "音乐剧公演", 日期: "2026.11.20 18:30", 描述: "公演跟拍\n联系人：王同学 · 微信 wx123" });
+add("tbl_act", { 活动名称: "普通活动", 日期: "2026.06", 描述: "红墙合照" });
+add("tbl_mem", { 姓名: "甲", 学号: "S001", 技能: "拍照、修图", 职位: "社员" });
+add("tbl_mem", { 姓名: "乙", 学号: "S002", 技能: "拍视频、剪视频" });
+const evFuture = add("tbl_ev", { 名称: "篮球 12年级ABCD小组赛", 类别: "篮球", 日期: day(3), 时间: "11:50-12:20", 状态: "开放报名", 需要人数: 2 });
+const evPast = add("tbl_ev", { 名称: "测试 · 已结束", 类别: "其他", 日期: day(-2), 时间: "11:50-12:20", 状态: "开放报名" });
+const evCancel = add("tbl_ev", { 名称: "已取消的", 类别: "足球", 日期: day(5), 时间: "放学", 状态: "已取消" });
+
+let llmCalls = 0, llmReply = '{"caption":"阳光下的冲刺","tags":["#校运会"]}';
+const calls = [];
+global.fetch = async (url, opts = {}) => {
+  const u = String(url), method = opts.method || "GET";
+  calls.push(method + " " + u);
+  const ok = (o) => ({ ok: true, status: 200, json: async () => o });
+  if (u.includes("tenant_access_token")) return ok({ code: 0, tenant_access_token: "T", expire: 7200 });
+  if (u.includes("api.deepseek.com")) {
+    llmCalls++;
+    const body = JSON.parse(opts.body);
+    assert.ok(body.max_tokens <= 2000, "max_tokens 应受限");
+    assert.ok(!/S00\d/.test(body.messages[0].content), "学号不应发给模型");
+    assert.ok(!/wx123/.test(body.messages[0].content), "联系人信息不应发给模型");
+    return ok({ choices: [{ message: { content: llmReply } }], usage: { prompt_tokens: 1000, completion_tokens: 100, prompt_cache_hit_tokens: 200, prompt_cache_miss_tokens: 800 } });
+  }
+  const m = u.match(/tables\/(\w+)\/records(?:\/(rec\w+))?(\?.*)?$/);
+  if (m) {
+    const t = db[m[1]];
+    if (!t) return ok({ code: 1254003, msg: "no table" });
+    if (m[2] && method === "GET") {
+      const r = t.find((x) => x.record_id === m[2]);
+      return ok(r ? { code: 0, data: { record: r } } : { code: 1254043, msg: "RecordIdNotFound" });
+    }
+    if (m[2] && method === "PUT") {
+      const r = t.find((x) => x.record_id === m[2]);
+      Object.assign(r.fields, JSON.parse(opts.body).fields);
+      return ok({ code: 0, data: { record: r } });
+    }
+    if (method === "POST") return ok({ code: 0, data: { record: add(m[1], JSON.parse(opts.body).fields) } });
+    return ok({ code: 0, data: { items: t.slice(), has_more: false } });
+  }
+  throw new Error("unexpected fetch " + method + " " + u);
+};
+
+const api = require("./index.js");
+const call = (method, path, body, token, query) => api.handle({
+  method, path, headers: token ? { authorization: "Bearer " + token } : {}, body: body ? JSON.stringify(body) : "", query: query || {},
+}, ENV).then((r) => ({ status: r.statusCode, body: JSON.parse(r.body || "{}") }));
+
+(async () => {
+  /* 1) 登录：同一个口令框，管理员口令拿到管理员 token */
+  let r = await call("POST", "/api/auth", { passcode: "admin-pass" });
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.role, "admin"); assert.strictEqual(r.body.token, "admin-token");
+  r = await call("POST", "/api/auth", { passcode: "member-pass" });
+  assert.strictEqual(r.body.role, "member"); assert.strictEqual(r.body.token, "member-token");
+  r = await call("POST", "/api/auth", { passcode: "admin-pas" });
+  assert.strictEqual(r.status, 401, "差一个字也不行");
+  // 没配 ADMIN_TOKEN 时，管理员口令无效（不会发空 token）
+  const noAdmin = await api.handle({ method: "POST", path: "/api/auth", headers: {}, body: JSON.stringify({ passcode: "admin-pass" }) }, { ...ENV, ADMIN_TOKEN: "" });
+  assert.strictEqual(noAdmin.statusCode, 401);
+
+  /* 2) 管理员接口：无 token 401、成员 403、伪造 token 401/403 */
+  for (const p of ["/api/admin/overview"]) {
+    assert.strictEqual((await call("GET", p)).status, 401);
+    assert.strictEqual((await call("GET", p, null, "member-token")).status, 403);
+    assert.strictEqual((await call("GET", p, null, "admin-token-x")).status, 401);
+  }
+  for (const [m, p] of [["POST", "/api/admin/events"], ["PUT", "/api/admin/events/" + evFuture.record_id], ["PUT", "/api/admin/applications/recX"],
+    ["POST", "/api/admin/ai/weekly"], ["POST", "/api/admin/ai/staffing"], ["POST", "/api/admin/requests/recX/convert"]]) {
+    assert.strictEqual((await call(m, p, {})).status, 401, p + " 无 token 应 401");
+    assert.strictEqual((await call(m, p, {}, "member-token")).status, 403, p + " 成员应 403");
+  }
+  assert.strictEqual(llmCalls, 0, "被拒绝的请求不应调用模型");
+
+  /* 3) 日历只读：不需要成员登录，不含名单 */
+  r = await call("GET", "/api/events");
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.items.length, 3);
+  assert.ok(!JSON.stringify(r.body).includes("S001"));
+
+  /* 4) 报名：需要成员；校验；幂等 */
+  const applyPath = "/api/events/" + evFuture.record_id + "/apply";
+  assert.strictEqual((await call("POST", applyPath, { name: "甲", studentId: "S001" })).status, 401);
+  assert.strictEqual((await call("POST", applyPath, { name: "甲", studentId: "bad id!" }, "member-token")).status, 400);
+  r = await call("POST", applyPath, { name: "甲", studentId: "S001" }, "member-token");
+  assert.strictEqual(r.status, 200); const app1 = r.body.item; assert.strictEqual(app1.status, "已报名");
+  r = await call("POST", applyPath, { name: "甲", studentId: "S001" }, "member-token");
+  assert.strictEqual(r.body.already, true, "重复报名不产生新记录");
+  assert.strictEqual(db.tbl_app.length, 1);
+  assert.strictEqual((await call("POST", "/api/events/" + evCancel.record_id + "/apply", { name: "甲", studentId: "S001" }, "member-token")).status, 409, "已取消的任务不能报名");
+  r = await call("GET", "/api/events");
+  assert.strictEqual(r.body.counts[evFuture.record_id].applied, 1);
+
+  /* 5) 交付：任务没结束不能交；链接必须是百度网盘；学号要对上 */
+  r = await call("POST", "/api/applications/" + app1.id + "/deliver", { studentId: "S001", link: "https://pan.baidu.com/s/1abcDEF", code: "ab12", desc: "x" }, "member-token");
+  assert.strictEqual(r.status, 409, "未结束不能交付");
+  r = await call("POST", "/api/events/" + evPast.record_id + "/apply", { name: "乙", studentId: "S002" }, "member-token");
+  assert.strictEqual(r.status, 409, "已结束的任务不能报名");
+  // 管理员指派乙到已结束任务（模拟赛前确认）
+  r = await call("POST", "/api/admin/applications", { eventId: evPast.record_id, name: "乙", studentId: "S002" }, "admin-token");
+  assert.strictEqual(r.status, 200); const app2 = r.body.item; assert.strictEqual(app2.status, "已确认");
+  const dpath = "/api/applications/" + app2.id + "/deliver";
+  assert.strictEqual((await call("POST", dpath, { studentId: "S001", link: "https://pan.baidu.com/s/1abcDEF", desc: "x" }, "member-token")).status, 403, "学号不匹配");
+  assert.strictEqual((await call("POST", dpath, { studentId: "S002", link: "https://evil.com/s/1abcDEF", desc: "x" }, "member-token")).status, 400, "非百度链接");
+  assert.strictEqual((await call("POST", dpath, { studentId: "S002", link: "https://pan.baidu.com.evil.com/s/1abcDEF", desc: "x" }, "member-token")).status, 400, "伪装域名");
+  assert.strictEqual((await call("POST", dpath, { studentId: "S002", link: "https://pan.baidu.com/s/1abcDEF", code: "toolong", desc: "x" }, "member-token")).status, 400, "提取码");
+  r = await call("POST", dpath, { studentId: "S002", link: "https://pan.baidu.com/s/1abcDEF?pwd=ab12", code: "ab12", desc: "冲刺瞬间", caption: "阳光" }, "member-token");
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.item.status, "已交付");
+  /* 6) 验收：只有交付后能验收 */
+  assert.strictEqual((await call("PUT", "/api/admin/applications/" + app1.id, { status: "已验收" }, "admin-token")).status, 409);
+  r = await call("PUT", "/api/admin/applications/" + app2.id, { status: "已验收" }, "admin-token");
+  assert.strictEqual(r.body.item.status, "已验收");
+  /* 我的任务 */
+  r = await call("GET", "/api/my", null, "member-token", { sid: "S002" });
+  assert.strictEqual(r.body.items.length, 1); assert.strictEqual(r.body.items[0].event.title, "测试 · 已结束");
+  /* 取消 */
+  r = await call("POST", "/api/applications/" + app1.id + "/cancel", { studentId: "S001" }, "member-token");
+  assert.strictEqual(r.body.item.status, "已取消");
+
+  /* 7) 管理员：建任务 / 校验 / 改 / 取消 / 转申请 */
+  assert.strictEqual((await call("POST", "/api/admin/events", { title: "x", category: "冰球", date: "2026-10-30" }, "admin-token")).status, 400);
+  r = await call("POST", "/api/admin/events", { title: "排球赛", category: "其他", date: "2026.10.30", time: "放学", need: 3 }, "admin-token");
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.item.date, "2026-10-30");
+  r = await call("PUT", "/api/admin/events/" + r.body.item.id, { status: "已取消" }, "admin-token");
+  assert.strictEqual(r.body.item.status, "已取消");
+  r = await call("GET", "/api/admin/overview", null, "admin-token");
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.requests.length, 2, "应认出两条拍摄申请");
+  assert.strictEqual(r.body.stats.members, 2);
+  assert.ok(r.body.contributions.find((p) => p.name === "乙").accepted === 1);
+  const reqId = r.body.requests.find((x) => x.name === "音乐剧公演").id;
+  r = await call("POST", "/api/admin/requests/" + reqId + "/convert", { category: "其他" }, "admin-token");
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.item.date, "2026-11-20"); assert.strictEqual(r.body.item.time, "18:30");
+  assert.ok(!r.body.item.note.includes("wx123"), "转任务时去掉联系人");
+  assert.strictEqual((await call("POST", "/api/admin/requests/" + reqId + "/convert", {}, "admin-token")).status, 409, "不重复转换");
+  assert.strictEqual(db.tbl_act.find((x) => x.record_id === reqId).fields.状态, undefined, "不改申请本身");
+
+  /* 8) AI：成员可润色；记账；预算/次数守卫 */
+  r = await call("POST", "/api/ai/caption", { desc: "冲刺瞬间，阳光很好" });
+  assert.strictEqual(r.status, 401);
+  r = await call("POST", "/api/ai/caption", { desc: "冲刺瞬间，阳光很好", eventTitle: "运动会" }, "member-token");
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body)); assert.strictEqual(r.body.caption, "阳光下的冲刺");
+  // 1000 输入（200 命中 + 800 未命中）+ 100 输出，高峰价：200*0.04 + 800*2 + 100*8 = 2408 / 1e6 元
+  assert.ok(Math.abs(r.body.cost - 0.002408) < 1e-9, "按高峰价计费: " + r.body.cost);
+  assert.strictEqual(db.tbl_ai.length, 1); assert.strictEqual(db.tbl_ai[0].fields.调用次数, 1);
+  // 冷却：4 秒内同功能再点被拒
+  r = await call("POST", "/api/ai/caption", { desc: "再来一次试试看" }, "member-token");
+  assert.strictEqual(r.status, 429); assert.strictEqual(r.body.code, "AI_RATE");
+  // 预算：把本月花费改到 17.999 → 超过 18 元停用线，拒绝且不调模型
+  const before = llmCalls;
+  db.tbl_ai[0].fields.费用元 = 17.999;
+  llmReply = '{"summary":"s","highlights":[],"risks":[],"next":[]}';
+  r = await call("POST", "/api/admin/ai/weekly", {}, "admin-token");
+  assert.strictEqual(r.status, 429); assert.strictEqual(r.body.code, "AI_BUDGET"); assert.ok(r.body.msg.includes("额度"));
+  assert.strictEqual(llmCalls, before, "超预算不调模型");
+  // 停用线不能高于上限：AI_STOP_AT_CNY=25 时按上限 20 算
+  db.tbl_ai[0].fields.费用元 = 19.995;
+  const low = await api.handle({ method: "POST", path: "/api/group", headers: { authorization: "Bearer member-token" }, body: JSON.stringify({ groupCount: 2 }) }, { ...ENV, AI_MONTHLY_CAP_CNY: "20", AI_STOP_AT_CNY: "25" });
+  assert.strictEqual(low.statusCode, 429, "停用线不能高于上限");
+  db.tbl_ai[0].fields.费用元 = 0.01;
+  r = await call("POST", "/api/admin/ai/weekly", {}, "admin-token");
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body)); assert.ok(r.body.report);
+  // 每日次数上限
+  db.tbl_ai.find((x) => x.fields.功能 === "weekly").fields.当日次数 = 10;
+  await new Promise((res) => setTimeout(res, 10));
+  const { _v4 } = api;
+  r = await call("POST", "/api/admin/ai/weekly", {}, "admin-token");
+  assert.strictEqual(r.status, 429); assert.ok(r.body.msg.includes("每日上限"));
+  // 用量表没配 → 所有 AI 拒绝
+  const noTbl = await api.handle({ method: "POST", path: "/api/ai/caption", headers: { authorization: "Bearer member-token" }, body: JSON.stringify({ desc: "一二三四五" }) }, { ...ENV, TABLE_AI_USAGE: "" });
+  assert.strictEqual(noTbl.statusCode, 429);
+  // 排班建议：名单外的人被过滤
+  llmReply = '{"picks":[{"name":"甲","reason":"会拍照"},{"name":"路人","reason":"x"}],"note":"ok"}';
+  r = await call("POST", "/api/admin/ai/staffing", { eventId: evFuture.record_id }, "admin-token");
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body)); assert.strictEqual(r.body.picks.length, 1); assert.ok(r.body.warnings.length === 1);
+  // 申请整理：类别不合法回落「其他」
+  llmReply = '{"title":"音乐剧公演跟拍","category":"冰球","date":"2026-11-20","time":"18:30-20:30","need":3,"note":"舞台"}';
+  r = await call("POST", "/api/admin/ai/draft", { requestId: reqId }, "admin-token");
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.draft.category, "其他"); assert.strictEqual(r.body.draft.need, 3);
+
+  /* 9) 纯函数 */
+  assert.ok(_v4.validBaiduLink("https://pan.baidu.com/s/1AbC-dEf_12"));
+  assert.ok(_v4.validBaiduLink("https://pan.baidu.com/share/init?surl=AbCd12"));
+  assert.ok(!_v4.validBaiduLink("http://pan.baidu.com/s/1AbCdEf"));
+  assert.ok(!_v4.validBaiduLink("https://pan.baidu.com/s/1Ab\"><script>"));
+  const w = _v4.eventWindow("2026-10-21", "放学");
+  assert.strictEqual(new Date(w.start).toISOString(), "2026-10-21T07:30:00.000Z");
+  assert.strictEqual(new Date(_v4.eventWindow("2026-10-12", "11:50-12:20").end).toISOString(), "2026-10-12T04:20:00.000Z");
+  assert.strictEqual(_v4.normDate("2026.10.8"), "2026-10-08");
+  assert.strictEqual(_v4.stopAt(), 18);
+
+  console.log("✅ v4 测试通过（日历 / 报名 / 交付 / 管理员鉴权 / AI 预算，模型调用 " + llmCalls + " 次）");
+})().catch((e) => { console.error("❌ v4 测试失败:", e && e.stack || e); process.exit(1); });

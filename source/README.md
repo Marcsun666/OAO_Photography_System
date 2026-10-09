@@ -2,7 +2,7 @@
 
 OAO 摄影社的「**内部工具 + 对外传播平台**」一体站：对外展示社团活动成果、照片合集与 B 站/小红书入口；对内提供活动记录、照片素材、百度网盘资料库的在线管理。
 
-> **接手这个项目？先读 [`HANDOVER-v3.md`](HANDOVER-v3.md)**（v2 现状、架构、密钥清单、迁移步骤）。历史记录见 [`HANDOVER.md`](HANDOVER.md) —— 当前实际进度、已知的坑、以及几件需要拍板的事。
+> **接手这个项目？先读 [`HANDOVER-v4.md`](HANDOVER-v4.md)**（架构、密钥清单、迁移步骤；第 17 节是 v4：日历/报名/交付、管理后台、AI 预算、上线与回滚）。历史记录见 [`HANDOVER.md`](HANDOVER.md) —— 当前实际进度、已知的坑、以及几件需要拍板的事。
 
 - 前端：原生 HTML + CSS + JavaScript（无构建、无框架），沿用现有玻璃拟态设计。
 - 数据：飞书多维表格（Bitable）作为在线数据库。
@@ -15,11 +15,13 @@ index.html          页面（全部 section 与登录/上传弹窗）
 styles.css          全局样式 + 设计变量
 script.js           画廊瀑布流、灯箱预览、招新表单
 app.js              数据层：登录、读库渲染、上传/贴链接、活动记录写入、成员资料与技能标签
+events.js           v4：拍摄日历、报名、我的任务、交付、隐藏管理后台（events.test.js 测渲染）
 config.js           前端配置（proxyUrl 等）
 functions/          Cloudflare Pages 密码锁（_middleware.js：品牌登录页 + 30 天签名 Cookie）
 cloud-function/     后端逻辑（Cloudflare Pages Functions 与腾讯云函数共用；dev-server.js 本地调试）
 tools/              build-deploy.sh（生成部署目录）、feishu/（建表与校验脚本）
-HANDOVER-v3.md      v2 交接文档（英文，最新）
+HANDOVER-v4.md      交接文档（英文，最新；v4 见第 17 节）
+HANDOVER-v3.md      v3 交接文档（英文，上一版）
 PLAN.md             修改计划书
 HANDOVER.md         交接说明：实际进度、已知限制、待决策事项
 SETUP.md            部署与配置步骤（飞书 / 腾讯云）

@@ -18,7 +18,17 @@ SPEC = {
     "外链": [TXT("标题"), SEL("平台", ["B站", "小红书", "其他"]), TXT("链接"), TXT("备注")],
     "成员": [TXT("姓名"), TXT("班级"), TXT("学号"), SEL("性别", ["男", "女", "无性别"]), TXT("职位"), TXT("技能"), TXT("备注")],
     "分组": [TXT("批次"), TXT("组名"), TXT("成员"), TXT("技能覆盖"), TXT("说明")],
+    # v4：拍摄日历 / 报名交付 / AI 用量（新表，不影响 v3 的五张表）
+    "拍摄任务": [TXT("名称"), SEL("类别", ["篮球", "足球", "匹克球", "乒乓球", "长绳", "文化周", "其他"]),
+              TXT("日期"), TXT("时间"), TXT("地点"), NUM("需要人数"),
+              SEL("状态", ["开放报名", "已安排", "已结束", "已取消"]), TXT("备注"), TXT("种子键"), TXT("来源申请")],
+    "报名与交付": [TXT("成员姓名"), TXT("学号"), TXT("任务ID"), TXT("任务名称"),
+              SEL("状态", ["已报名", "已确认", "已交付", "已验收", "已退回", "已取消"]),
+              TXT("百度网盘链接"), TXT("提取码"), TXT("描述"), TXT("AI文案"), TXT("报名时间"), TXT("提交时间"), TXT("管理备注")],
+    "AI用量": [TXT("键"), TXT("月份"), TXT("功能"), NUM("调用次数"), NUM("输入tokens"), NUM("输出tokens"),
+             {"field_name": "费用元", "type": 2, "property": {"formatter": "0.0000"}}, TXT("当日"), NUM("当日次数")],
 }
 
 ENV_VAR = {"活动记录": "TABLE_ACTIVITIES", "照片素材": "TABLE_PHOTOS", "外链": "TABLE_LINKS",
-           "成员": "TABLE_MEMBERS", "分组": "TABLE_GROUPS"}
+           "成员": "TABLE_MEMBERS", "分组": "TABLE_GROUPS",
+           "拍摄任务": "TABLE_EVENTS", "报名与交付": "TABLE_APPLICATIONS", "AI用量": "TABLE_AI_USAGE"}

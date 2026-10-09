@@ -96,12 +96,14 @@ function loginPage({ next = "/", error = false, status = 401 } = {}) {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#f5f5f7" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
 <meta name="robots" content="noindex, nofollow" />
 <title>OAO 摄影社 · 成员登录</title>
 <style>
   /* v3 r2：与站点首屏同一套底色与光晕，登录 → 进站是一段连续的过渡；无外链资源 */
-  :root { color-scheme: light; --green: #007354; --text: #1d1d1f; --muted: #6e6e73;
+  :root { color-scheme: light dark; --green: #007354; --text: #1d1d1f; --muted: #6e6e73;
     --e: cubic-bezier(0.22, 1, 0.36, 1); --spring: cubic-bezier(0.34, 1.4, 0.64, 1); }
   * { box-sizing: border-box; }
   html { background: #f5f5f7; }
@@ -167,6 +169,33 @@ function loginPage({ next = "/", error = false, status = 401 } = {}) {
   .foot { margin: 24px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
   @media (max-width: 440px) { main { padding: 38px 22px 26px; } }
   @media (prefers-reduced-transparency: reduce) { main { background: #fff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; } }
+  /* v4：深色模式跟随系统（实时切换），色板与站内一致 */
+  @media (prefers-color-scheme: dark) {
+    :root { --green: #30d158; --text: #f5f5f7; --muted: #a1a1a6; }
+    html { background: #000; }
+    body {
+      background:
+        radial-gradient(70vmax 46vmax at 10% -6%, rgba(48, 209, 88, 0.08), transparent 62%),
+        radial-gradient(64vmax 42vmax at 96% 2%, rgba(10, 132, 255, 0.09), transparent 62%),
+        #000;
+      background-repeat: no-repeat; background-color: #000;
+    }
+    main { background: rgba(28, 28, 30, 0.96);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 30px 80px -10px rgba(0, 0, 0, 0.8); }
+    .logo { filter: invert(1) brightness(0.96); }
+    input[type="password"] { background: rgba(118, 118, 128, 0.24); }
+    input[type="password"]:hover { background: rgba(118, 118, 128, 0.30); }
+    input[type="password"]:focus { background: #2c2c2e; box-shadow: 0 0 0 6px rgba(48, 209, 88, 0.16); }
+    input[aria-invalid="true"], input[aria-invalid="true"]:focus { outline-color: #ff453a; background: #2c2c2e; box-shadow: 0 0 0 6px rgba(255, 69, 58, 0.16); }
+    button { background: linear-gradient(180deg, #fff 0%, #e5e5ea 100%); color: #000;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 20px rgba(0, 0, 0, 0.5); }
+    button:hover { background: #fff; }
+    .error { color: #ff6961; }
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    @media (prefers-color-scheme: dark) { main { background: rgba(28, 28, 30, 0.64); } }
+  }
+  @media (prefers-color-scheme: dark) and (prefers-reduced-transparency: reduce) { main { background: #1c1c1e !important; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 </style>
 </head>
