@@ -57,12 +57,12 @@ Sections of `index.html`, top to bottom:
 | Section (id) | Heading | What it does |
 |---|---|---|
 | hero, stat-band | – | Hero image. The stats show activity count, 照片数 total and 视频数 total, summed live from 活动记录 |
-| `#record` | 选择记录方式 | Cards for 照片组 / 视频组 and the Bilibili account card (placeholder link) |
+| `#record` | 选择记录方式 | Cards for 照片组 / 视频组 and the club account card (v2: Bilibili placeholder; v3: real 小红书 link) |
 | `#workspace` | 照片 / 视频工作台 | Status counts per group (照片组: 待选片/精修中/待交付/已归档; 视频组: 待剪辑/调色中/待发布/已发布) |
 | `#request` | 申请 OAO 拍摄活动 | **Shooting-request form.** It posts to `/api/request` and creates a 活动记录 row with 状态=待选片 |
 | `#timeline` | 活动记录时间线 | Activity timeline from 活动记录, with the 封面 cover image |
 | `#library` | 活动素材库 | Material library from 照片素材: cloud-drive links with 提取码, and uploaded files |
-| `#bilibili` | B 站视频作品区 | Links from 外链 where 平台 = B站 |
+| `#bilibili` (v3: `#rednote`) | B 站视频作品区 (v3: 小红书 · 作品与动态) | v2: links from 外链 where 平台 = B站. v3: all 外链 items, plus the club's 小红书 profile card (§16.2c) |
 | `#works` | 照片合集 | Masonry gallery of uploaded photos with a lightbox. Images load through `/api/file/:token` |
 | `#members` | 成员资料与技能 | Member profile form (姓名/班级/学号/性别/职位/技能/备注), the roster, and the **AI 分组** tool (`#group-tool`, 2–20 groups). All of it needs member login |
 | `#teams`, `#events` | – | Static club intro |
@@ -443,13 +443,12 @@ Use this only if needed. It requires Tencent real-name verification, which the o
 
 ## 12. Known limitations and TODOs
 
-1. **Bilibili / 小红书 links are waiting on the owner.** Placeholders with `href="#"` are in `index.html`:
-   - line 133: `B站账号链接占位` (the `#bilibili-link` card)
-   - line 272: `B站主页占位`
-   - lines 482–483: footer B站 / 小红书
-   - line 275: the empty-state text
+1. **Club social link: production (v2) still has the old placeholders.** v2 production still has `href="#"` placeholders for Bilibili / 小红书 (the `#bilibili-link` card, the `#bilibili` section button and the footer). **v3 r3 resolves this:**
+   - The club account is now 小红书: `https://www.xiaohongshu.com/user/profile/67241375000000001d02e0f8`.
+   - Share-tracking parameters were removed, and every link opens in a new tab with `rel="noopener"`.
+   - The links are marked `data-rednote` in `index.html` and set as `REDNOTE_URL` in `app.js`.
 
-   Individual videos can be added without code changes through ＋ 上传 / 贴链接 (the 外链 table, 平台=B站).
+   Individual works (小红书 or B站) can still be added without code changes through ＋ 上传 / 贴链接 → B站 / 小红书 (the 外链 table).
 2. **No photo resize before upload.** Originals are uploaded as base64 (up to 20 MB) and the gallery loads the **full-size originals**, so big phone photos make it slow. TODO: shrink images in the browser (canvas, ~2000 px, WebP/JPEG ~0.8) before `readAsBase64` in `app.js`.
 3. **Favicon:** `assets/brand/OAO.png` is a white logo and nearly invisible on light browser tabs. TODO: add a dark or filled favicon.
 4. **Change the site password:** it was typed in a chat during setup. Change it before sharing widely (§6). This logs everyone out.
@@ -640,6 +639,76 @@ The owner's feedback: "epic transitions, smooth transitions, smoother corners, t
 - Playwright WebKit (iPhone 14 emulation, and 1280 desktop): login, reveal (25/25 elements), hero scroll effect, member login, no page errors.
 
 Screenshots are in `/workspace/v3-shots/r2/`.
+
+### 16.2c v3 r3 refinement (2026-10-09, owner's second review)
+
+The owner asked for:
+
+- the club's 小红书 (Rednote) link instead of Bilibili,
+- truly transparent liquid glass,
+- example pictures in 活动素材库,
+- no animation changes beyond small optimisations.
+
+**1. 小红书 replaces Bilibili as the club link**
+
+- **Link:** `https://www.xiaohongshu.com/user/profile/67241375000000001d02e0f8`. The `xsec_token`, `share_id`, `appuid` and other share parameters were dropped. Every instance has `target="_blank" rel="noopener"`.
+- **Labels:** nav, footer nav and the mobile tab bar now say 小红书 → `#rednote`. The tab bar uses a simple inline "note" glyph rather than a logo file.
+- **Section:** `#bilibili` "B 站视频作品区" is now `#rednote` "小红书 · 作品与动态", with a 在小红书关注 OAO button.
+  - It now lists **every** 外链 item (小红书, B站 and 其他), with a platform-tinted cover mark.
+  - When there are none, it shows a profile card that links to the account.
+  - The grid id is still `#video-grid`, so the tests and contract are unchanged.
+- **Other places:**
+  - The `#record` platform card is now "OAO 摄影社 · 小红书" (`#rednote-link`).
+  - The footer social link is the real profile; the B站 placeholder was removed.
+  - The 视频组 card copy was updated.
+- **Unchanged:** the member "贴 B站 / 小红书" upload mode and the 外链 平台 options (B站 / 小红书 / 其他), because members may still post Bilibili videos.
+
+**2. Clear liquid glass**
+
+- **Which surfaces:** nav, mobile tab bar, `.button.glass`, back-to-top, the stats card, modal close buttons, and photo badges.
+- **Recipe:**
+  - fill: about 5% white, plus a diagonal specular sheen gradient (`--g-fill`),
+  - `backdrop-filter: blur(3px) saturate(180%) brightness(1.06)`,
+  - shape from a crisp top highlight, side rims, an inner light rim, a hairline and a soft shadow (`--g-rim`).
+- **SVG refraction stays off.** Its edge artifact is not fixed; the lens feel comes from the layered highlights instead.
+- **Readability:**
+  - Two IntersectionObservers watch narrow top and bottom strips of the screen. When a dark photo (hero photo, covered activity tiles, gallery shots, library samples, or `[data-tone="dark"]`) is under the nav or tab bar, those get `.on-dark`: white text with a shadow. Otherwise the text is dark with a white halo.
+  - The mobile hamburger dropdown stays frosted and near-opaque, because it is a reading panel.
+- **Stats card:** now sits entirely inside the bottom of the hero photo (desktop 104px tall; mobile a single 4-column row 70px tall), so the glass is always over the photo and white text is readable. This also stops the mobile tab bar from covering it on first load.
+- **Fallbacks:** `prefers-reduced-transparency` turns all of these solid (light surfaces, or dark for the stats card and photo badges), and `prefers-contrast: more` darkens the stats card.
+- **Left as they were:** modal sheets, toasts and the request/join forms keep their solid or frosted surfaces, because they are large reading surfaces.
+
+**3. Example photos in 活动素材库**
+
+- When the 照片素材 table has no records, `renderLibrary()` shows `librarySamples()`: 8 photos from `assets/events/*.webp`.
+  - They are lazy-loaded and have a glass 示例 tag and caption.
+  - A note above them says they are examples.
+  - `assets/media` is never used.
+- They are frontend-only, with nothing written to Feishu, and they disappear automatically as soon as a real photo record exists.
+- The lightbox now pages within the group you clicked: 照片合集 or the library samples (1 / 8 …).
+
+**4. Performance only (animation timing unchanged)**
+
+- **Scroll handlers:**
+  - Scrollspy is rAF-throttled and only writes to the DOM when the active item changes.
+  - The scroll progress bar uses `transform: scaleX()` instead of `width`, so it never triggers layout.
+- **will-change:** the hero photo's `will-change` is released once the hero scroll effect finishes (`.hp-idle`).
+- **Glass cost:** the blur on glass dropped from 14–24px to 3px, which is much cheaper to composite on mobile.
+
+**5. Fixes**
+
+- **Desktop hero gap:** `.hero` had an inherited 48px flex `gap`. It is removed, and the photo margin is now `clamp(28px, 3.2vw, 40px)`. The gap went from about 125px to about 80px.
+- **1px seam:** the bottom of the photo sections (作品 / 申请拍摄 / 加入) had a 1px seam caused by fractional section heights.
+  - Fix: the gradient layer is now 2px taller than the section and holds solid page colour for the first and last 3%.
+  - Check: a pixel-column seam scan of the whole page found no seams at 1280 or 390.
+
+**Tested on:**
+
+- the 4 test files,
+- read-only API checks,
+- Chrome and Playwright WebKit (iPhone 14 emulation and 1280): no page errors, all 8 samples render, the lightbox works, the nav gets `.on-dark` over the photo, and the 小红书 button opens the profile in a new tab.
+
+Screenshots are in `/workspace/v3-shots/r3/`.
 
 ### 16.3 Promote v3 to production (only after the owner approves)
 

@@ -51,8 +51,13 @@
     let items = [];
     let index = 0;
 
-    const getItems = () =>
-      Array.prototype.slice.call(document.querySelectorAll(".gallery-grid [data-full]"));
+    /* v3 r3：灯箱按「点的是哪一组」取图 —— 照片合集和素材库示例各翻各的 */
+    const getItems = (target) => {
+      const group = target && target.closest(".gallery-grid, .archive-grid");
+      return Array.prototype.slice.call(
+        group ? group.querySelectorAll("[data-full]") : document.querySelectorAll(".gallery-grid [data-full]")
+      );
+    };
 
     function render() {
       const target = items[index];
@@ -73,7 +78,7 @@
     }
 
     function open(target) {
-      items = getItems();
+      items = getItems(target);
       index = Math.max(0, items.indexOf(target));
       if (!items.length) return;
       render();
@@ -129,16 +134,24 @@
     .map((a) => document.querySelector(a.getAttribute("href")))
     .filter(Boolean);
 
+  /* v3 r3：滚动高亮放进 rAF，并且结果没变就不写 DOM —— 之前每个 scroll 事件
+   * 都读一遍 offsetTop 再写 class，滚动时会反复触发同步布局。 */
+  let spyQueued = false;
+  let spyLast = "";
   function updateSpy() {
+    spyQueued = false;
     if (!navLinks.length) return;
     const pos = (window.scrollY || 0) + 140;
     let current = navLinks[0];
     spySections.forEach((sec, i) => {
       if (sec && sec.offsetTop <= pos) current = navLinks[i];
     });
-    navLinks.forEach((a) => a.classList.toggle("active", a === current));
     // v3：手机底部标签栏跟着高亮（首屏 hero 时不高亮任何一项）
     const href = (window.scrollY || 0) > 240 ? current.getAttribute("href") : "";
+    const key = current.getAttribute("href") + "|" + href;
+    if (key === spyLast) return;
+    spyLast = key;
+    navLinks.forEach((a) => a.classList.toggle("active", a === current));
     tabLinks.forEach((a) => {
       const on = a.getAttribute("href") === href;
       a.classList.toggle("active", on);
@@ -146,8 +159,11 @@
       else a.removeAttribute("aria-current");
     });
   }
-  window.addEventListener("scroll", updateSpy, { passive: true });
-  window.addEventListener("resize", updateSpy);
+  const queueSpy = () => {
+    if (!spyQueued) { spyQueued = true; window.requestAnimationFrame(updateSpy); }
+  };
+  window.addEventListener("scroll", queueSpy, { passive: true });
+  window.addEventListener("resize", queueSpy, { passive: true });
   updateSpy();
 
   /* ============ v3 动效：入场揭示 + hero 滚动叙事 ============
@@ -205,7 +221,7 @@
     /* —— 2) hero 滚动叙事：照片卡从 0.9 放大到 1，图像轻微视差，标题淡出 —— */
     var hero = document.querySelector(".hero");
     if (!hero || !window.requestAnimationFrame) return;
-    var ticking = false, last = -1;
+    var ticking = false, last = -1, heroIdle = false;
     function frame() {
       ticking = false;
       var y = window.scrollY || window.pageYOffset || 0;
@@ -215,6 +231,9 @@
       if (p === last) return;
       last = p;
       hero.style.setProperty("--hp", p);
+      /* will-change 只在 hero 动画进行中保留，滚过之后释放合成层（手机省内存） */
+      var idle = p >= 1;
+      if (idle !== heroIdle) { heroIdle = idle; hero.classList.toggle("hp-idle", idle); }
     }
     function onScroll() {
       if (!ticking) { ticking = true; window.requestAnimationFrame(frame); }
@@ -222,6 +241,36 @@
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     frame();
+  })();
+
+  /* ============ v3 r3：透明玻璃的明暗自适应 ============
+   * 玻璃几乎全透明后，导航 / 标签栏压在深色照片上时深色字会看不清。
+   * 用两个 IntersectionObserver 盯住屏幕顶部 / 底部的一条窄带：
+   * 有深色照片（[data-tone="dark"] 或 hero 照片、带封面的活动卡、照片墙）
+   * 进入窄带时，给对应的玻璃加 .on-dark，字变白并加阴影。
+   * 不在滚动事件里读布局，没有额外开销。 */
+  (function setupGlassTone() {
+    if (!("IntersectionObserver" in window)) return;
+    const DARK = ".hero-media, .timeline-list .tile.has-cover, .gallery-grid .shot, .archive-sample, [data-tone='dark']";
+    const header = document.querySelector(".site-header");
+    const bottomGlass = [document.querySelector(".tab-bar"), document.querySelector("#back-to-top")].filter(Boolean);
+    function watch(rootMargin, apply) {
+      const hits = new Set();
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((en) => (en.isIntersecting ? hits.add(en.target) : hits.delete(en.target)));
+        apply(hits.size > 0);
+      }, { rootMargin: rootMargin, threshold: 0 });
+      const observeAll = () => document.querySelectorAll(DARK).forEach((n) => io.observe(n));
+      observeAll();
+      // 动态渲染的卡片（时间线 / 照片墙 / 素材库示例）出现后再补挂
+      const mo = new MutationObserver(observeAll);
+      ["#timeline-list", "#gallery-grid", "#archive-grid"].forEach((sel) => {
+        const n = document.querySelector(sel);
+        if (n) mo.observe(n, { childList: true });
+      });
+    }
+    if (header) watch("-20px 0px -92% 0px", (dark) => header.classList.toggle("on-dark", dark));
+    if (bottomGlass.length) watch("-90% 0px -16px 0px", (dark) => bottomGlass.forEach((g) => g.classList.toggle("on-dark", dark)));
   })();
 
   /* ============ Liquid Glass 折射 ============ *
@@ -458,7 +507,8 @@
     const updateProgress = () => {
       const max = (document.documentElement.scrollHeight || 0) - (window.innerHeight || 0);
       const pct = max > 0 ? Math.min(100, Math.max(0, ((window.scrollY || 0) / max) * 100)) : 0;
-      progress.style.width = pct + "%";
+      // v3 r3：用 transform 代替 width，进度条只走合成层，不触发布局
+      progress.style.transform = "scaleX(" + (pct / 100).toFixed(4) + ")";
     };
     window.addEventListener("scroll", updateProgress, { passive: true });
     window.addEventListener("resize", updateProgress);

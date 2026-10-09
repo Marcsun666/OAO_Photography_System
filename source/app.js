@@ -1,7 +1,7 @@
 /**
  * OAO 摄影社 · 数据层
  * ------------------------------------------------------------------
- * 职责：登录门、读库渲染（hero 统计 / 工作台 / 时间线 / 素材库 / 照片合集 / B站区）、
+ * 职责：登录门、读库渲染（hero 统计 / 工作台 / 时间线 / 素材库 / 照片合集 / 小红书区）、
  *       上传与贴网盘链接、活动记录写入。
  *
  * 依赖 config.js（window.OAO_CONFIG）。proxyUrl 为空时运行在「静态回退模式」：
@@ -461,7 +461,31 @@
       return '<article class="archive-card">' + thumb +
         "<div><p class=\"panel-label\">" + esc(act) + "</p><h3>" + esc(note || act) + "</h3>" +
         "<span>" + esc(category) + "</span>" + action + "</div></article>";
-    }).join("") || emptyState("素材库还是空的，登录后上传或贴网盘链接。");
+    }).join("") || librarySamples();
+  }
+
+  /* v3 r3：素材库为空时，用站内已有的活动照片做示例（仅前端占位，不写飞书）。
+   * 一旦「照片素材」里有真实记录，renderLibrary 走上面的分支，示例自动消失。
+   * 只用 assets/events —— assets/media（成员照片）出于隐私不放进来。 */
+  var LIBRARY_SAMPLES = [
+    ["figaro-stage", "费加罗的婚礼 · 舞台", "舞台"],
+    ["volleyball-team-red-1", "排球社合照", "联动"],
+    ["sports-track-start", "运动会 · 起跑", "运动会"],
+    ["orchestra-conductor", "管弦乐团 · 指挥", "舞台"],
+    ["recruitment-booth-music", "社团招新现场", "招新"],
+    ["auto-flame-test", "汽车社 · 实验", "联动"],
+    ["volunteer-day-campus", "志愿者日", "校园"],
+    ["relay-runner", "接力赛", "运动会"]
+  ];
+  function librarySamples() {
+    return '<div class="sample-note"><span class="sample-chip">示例</span>素材库还是空的。下面是往期活动照片示例，成员上传真实素材后会自动替换。</div>' +
+      LIBRARY_SAMPLES.map(function (x) {
+        var src = "assets/events/" + x[0] + ".webp";
+        return '<button class="archive-sample" type="button" data-full="' + src + '" data-caption="示例 · ' + esc(x[1]) + '">' +
+          '<img src="' + src + '" alt="' + esc(x[1]) + '（示例）" loading="lazy" decoding="async" />' +
+          '<span class="sample-tag">示例</span>' +
+          '<span class="sample-cap"><em>' + esc(x[2]) + "</em>" + esc(x[1]) + "</span></button>";
+      }).join("");
   }
 
   function renderWorks(photos) {
@@ -492,25 +516,37 @@
     });
   }
 
+  /* v3 r3：俱乐部主账号改为小红书。这一区列出「外链」表里的全部作品链接
+   * （小红书 / B站 / 其他都保留，成员仍可能贴 B站 视频），空的时候显示主页卡片。 */
+  var REDNOTE_URL = "https://www.xiaohongshu.com/user/profile/67241375000000001d02e0f8";
+  function platformKind(p) {
+    p = String(p || "").toLowerCase();
+    if (p.indexOf("小红书") >= 0 || p.indexOf("rednote") >= 0 || p.indexOf("xiaohongshu") >= 0) return "rednote";
+    if (p.indexOf("b站") >= 0 || p.indexOf("bilibili") >= 0) return "bilibili";
+    return "other";
+  }
   function renderVideo(links) {
     var grid = el("#video-grid");
     if (!grid) return;
-    var bili = links.filter(function (l) {
-      var p = str(l.fields, F.link.platform);
-      return p === "B站" || p === "Bilibili" || p === "bilibili";
-    });
-    if (bili.length) {
-      grid.innerHTML = bili.map(function (l) {
-        var title = str(l.fields, F.link.title) || "B站视频";
+    var items = links.filter(function (l) { return str(l.fields, F.link.url) || str(l.fields, F.link.title); });
+    if (items.length) {
+      grid.innerHTML = items.map(function (l) {
+        var platform = str(l.fields, F.link.platform) || "外链";
+        var kind = platformKind(platform);
+        var title = str(l.fields, F.link.title) || (kind === "rednote" ? "小红书笔记" : kind === "bilibili" ? "B站视频" : "作品链接");
         var url = str(l.fields, F.link.url);
         var note = str(l.fields, F.link.note);
-        var platform = str(l.fields, F.link.platform) || "B站";
-        return '<a class="video-card-item" href="' + esc(url || "#") + '" target="_blank" rel="noopener">' +
-          '<div class="video-cover"><span class="video-play">▶</span></div>' +
+        var mark = kind === "bilibili" ? "▶" : kind === "rednote" ? "书" : "↗";
+        return '<a class="video-card-item is-' + kind + '" href="' + esc(url || "#") + '" target="_blank" rel="noopener">' +
+          '<div class="video-cover"><span class="video-play">' + mark + "</span></div>" +
           "<div><span>" + esc(platform) + "</span><h3>" + esc(title) + "</h3><p>" + esc(note) + "</p></div></a>";
       }).join("");
     } else {
-      grid.innerHTML = emptyState("还没有 B 站链接，稍后补充。");
+      grid.innerHTML = '<a class="rednote-profile" href="' + REDNOTE_URL + '" target="_blank" rel="noopener" data-rednote>' +
+        '<span class="rednote-avatar" aria-hidden="true">OAO</span>' +
+        '<span class="rednote-meta"><strong>OAO 摄影社</strong><span>小红书 · 活动返图 / 幕后花絮 / 招新动态</span></span>' +
+        '<span class="rednote-go">去关注 ↗</span></a>' +
+        emptyState("还没有作品链接。成员登录后可以贴小红书 / B站作品。");
     }
   }
 
