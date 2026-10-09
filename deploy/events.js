@@ -66,8 +66,15 @@
     });
     return map;
   }
+  /* v4.1 polish：「结束」= 时间过了，或管理员标了「已结束」（和服务端 isEnded 同一口径）。
+   * 单个时间「15:30」按 1 小时算，「放学」= 15:30–17:30，由服务端算好 end。 */
+  function isEnded(e, now) {
+    if (!e) return false;
+    if (e.status === "已结束" || e.ended) return true;
+    return !!e.end && (now == null ? Date.now() : now) >= e.end;
+  }
   function evClass(e) {
-    return "c-" + catKey(e.category) + (e.status === "已取消" ? " is-cancel" : "") + (e.ended ? " is-ended" : "");
+    return "c-" + catKey(e.category) + (e.status === "已取消" ? " is-cancel" : "") + (isEnded(e) ? " is-ended" : "");
   }
   /* v4.1 CAS 时间：「C 1 · S 1.5」（没有 A）。缺值按 1 显示；飞书可能给字符串 "1.5"。
    * 桌面月历格子里不放可见标签（1280px 下会把 5/24 个任务名截断），只放在悬停提示和读屏文字里；
@@ -102,34 +109,48 @@
     }).join("");
     return head + body;
   }
+  /* v4.1 polish：没有任务的周——已经过去的整周不显示；本周和以后的显示一行淡淡的「本周暂无任务」 */
   function renderAgendaHTML(y, m, events, today, counts) {
-    var map = byDay(events), out = "", n = daysIn(y, m), weekOpen = false, any = false, examShown = {};
+    var map = byDay(events), out = "", n = daysIn(y, m), any = false, examShown = {};
+    var wk = null;
+    function closeWeek() {
+      if (!wk) return;
+      var past = today && /^\d{4}-\d{2}-\d{2}$/.test(today) && wk.end < today;
+      if (wk.body) out += '<div class="ag-week"><p class="ag-week-h">' + wk.head + "</p>" + wk.body + "</div>";
+      else if (!past) out += '<div class="ag-week is-empty"><p class="ag-week-h">' + wk.head + '</p><p class="ag-none">本周暂无任务</p></div>';
+      wk = null;
+    }
     for (var d = 1; d <= n; d++) {
       var day = ymd(y, m, d), dow = dowMon(y, m, d), list = map[day] || [], ex = examOf(day);
       if (dow === 0 || d === 1) {
-        if (weekOpen) out += "</div>";
+        closeWeek();
         var wEnd = addDays(day, 6 - dow);
-        out += '<div class="ag-week"><p class="ag-week-h">' + cnDate(day) + " – " + cnDate(wEnd) + "</p>";
-        weekOpen = true;
+        wk = { head: cnDate(day) + " – " + cnDate(wEnd), end: wEnd, body: "" };
       }
       if (ex && !examShown[ex.from]) {
         examShown[ex.from] = 1; any = true;
-        out += '<div class="ag-exam"><span>' + esc(ex.label) + "</span>" + cnDate(ex.from) + " – " + cnDate(ex.to) + " · 这周没有拍摄任务</div>";
+        wk.body += '<div class="ag-exam"><span>' + esc(ex.label) + "</span>" + cnDate(ex.from) + " – " + cnDate(ex.to) + " · 这周没有拍摄任务</div>";
       }
       if (!list.length) continue;
       any = true;
-      out += '<div class="ag-day' + (day === today ? " is-today" : "") + '"><div class="ag-date"><strong>' + d + "</strong><span>周" + WEEK[dow] + "</span></div><div class=\"ag-list\">" +
+      wk.body += '<div class="ag-day' + (day === today ? " is-today" : "") + '"><div class="ag-date"><strong>' + d + "</strong><span>周" + WEEK[dow] + "</span></div><div class=\"ag-list\">" +
         list.map(function (e) {
           return '<button class="ag-ev ' + evClass(e) + '" type="button" data-ev="' + esc(e.id) + '"><i aria-hidden="true"></i><span class="ag-t">' + esc(e.title) +
-            '</span><span class="ag-m">' + esc(e.time || "全天") + " · " + esc(e.status === "开放报名" && !e.ended ? countText(e, counts) : e.ended && e.status !== "已取消" ? "已结束" : e.status) + "</span>" +
+            '</span><span class="ag-m">' + esc(e.time || "全天") + " · " + esc(e.status === "开放报名" && !isEnded(e) ? countText(e, counts) : isEnded(e) && e.status !== "已取消" ? "已结束" : e.status) + "</span>" +
             casLine(e) + "</button>";
         }).join("") + "</div></div>";
     }
-    if (weekOpen) out += "</div>";
+    closeWeek();
     return any ? out : '<div class="empty-state">这个月还没有拍摄任务。</div>';
   }
   function casLine(e) { return '<span class="ag-cas"><b>CAS 时间</b>' + esc(casText(e)) + "</span>"; }
-  var pure = { monthCells: monthCells, renderMonthHTML: renderMonthHTML, renderAgendaHTML: renderAgendaHTML, catKey: catKey, shortTitle: shortTitle, casText: casText, EXAMS: EXAMS, CATS: CATS };
+  /* v4.1 polish：同一个状态在全站用同一种颜色（日历详情、我的任务、后台全流程、流程条一致）
+   *   蓝 = 开放报名 / 已报名；绿 = 已安排 / 已确认；橙 = 已交付（待验收）；紫 = 已验收；
+   *   红 = 已退回；灰 = 已结束；灰 + 删除线 = 已取消；黄 = 待处理申请 */
+  var PILL = { "已报名": "p-applied", "已确认": "p-ok", "已交付": "p-done", "已验收": "p-accept", "已退回": "p-back", "已取消": "p-cancel",
+    "开放报名": "p-open", "已安排": "p-ok", "已结束": "p-muted", "待处理申请": "p-request", "已转为任务": "p-ok" };
+  function pillClass(st) { return PILL[st] || "p-muted"; }
+  var pure = { monthCells: monthCells, renderMonthHTML: renderMonthHTML, renderAgendaHTML: renderAgendaHTML, catKey: catKey, shortTitle: shortTitle, casText: casText, isEnded: isEnded, pillClass: pillClass, EXAMS: EXAMS, CATS: CATS };
   if (typeof module !== "undefined" && module.exports) { module.exports = pure; return; }
   window.OAOCal = pure;
 
@@ -159,14 +180,12 @@
     for (var i = 0; i < S.mine.length; i++) if (S.mine[i].eventId === id && S.mine[i].status !== "已取消") return S.mine[i];
     return null;
   }
-  function pill(st) {
-    var k = { "已报名": "p-applied", "已确认": "p-ok", "已交付": "p-done", "已验收": "p-accept", "已退回": "p-back", "已取消": "p-cancel",
-      "开放报名": "p-open", "已安排": "p-ok", "已结束": "p-muted" }[st] || "p-muted";
-    return '<span class="pill ' + k + '">' + esc(st) + "</span>";
+  function pill(st, label) {
+    return '<span class="pill ' + pillClass(st) + '">' + esc(label || st) + "</span>";
   }
   function phase(e) {
     if (e.status === "已取消") return "已取消";
-    if (e.ended) return "已结束";
+    if (isEnded(e)) return "已结束";
     return e.status;
   }
   function aiCostLine(r) {
@@ -218,6 +237,7 @@
       S.loaded = true; S.error = "";
       if (!S.y) { var t = parseYmd(S.today); S.y = t.y; S.m = t.m; }
       renderCalendar();
+      if (O.setUpcoming) O.setUpcoming(S.events.filter(function (e) { return e.status !== "已取消" && !isEnded(e); }).length);
     }).catch(function (e) {
       S.loaded = true; S.error = e.message;
       if (!S.y) { var t = parseYmd(localToday()); S.y = t.y; S.m = t.m; }
@@ -254,12 +274,12 @@
     if (e.status === "已取消") action = '<p class="ev-hint">这个任务已取消。</p>';
     else if (mine) {
       action = '<div class="ev-mine"><p>你已报名 ' + pill(mine.status) + "</p>" +
-        (e.ended && ["已报名", "已确认", "已退回", "已交付"].indexOf(mine.status) >= 0
+        (isEnded(e) && ["已报名", "已确认", "已退回", "已交付"].indexOf(mine.status) >= 0
           ? '<button class="button primary" type="button" data-deliver="' + esc(mine.id) + '">' + (mine.status === "已交付" ? "重新交付" : "交付素材") + "</button>" : "") +
-        (!e.ended && ["已报名", "已确认"].indexOf(mine.status) >= 0
+        (!isEnded(e) && ["已报名", "已确认"].indexOf(mine.status) >= 0
           ? '<button class="button ghost" type="button" data-cancel="' + esc(mine.id) + '">取消报名</button>' : "") +
-        (!e.ended ? '<p class="ev-hint">任务结束后，这里会出现「交付素材」。</p>' : "") + "</div>";
-    } else if (e.ended) action = '<p class="ev-hint">任务已经结束。参加了但没报名？请联系管理员补登记。</p>';
+        (!isEnded(e) ? '<p class="ev-hint">任务时间过了（或管理员标记「已结束」）后，这里会出现「交付素材」。</p>' : "") + "</div>";
+    } else if (isEnded(e)) action = '<p class="ev-hint">任务已经结束。参加了但没报名？请联系管理员补登记。</p>';
     else if (e.status !== "开放报名") action = '<p class="ev-hint">这个任务目前「' + esc(e.status) + "」，暂不接受报名。</p>";
     else if (!isMember()) action = '<button class="button primary" type="button" data-login-apply="' + esc(e.id) + '">成员登录后报名</button><p class="ev-hint">报名需要社团成员口令。</p>';
     else {
@@ -276,7 +296,7 @@
       '<dl class="ev-meta">' + rows.map(function (r) { return "<div><dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd></div>"; }).join("") + "</dl>" +
       (e.note ? '<p class="ev-note">' + esc(e.note) + "</p>" : "") +
       '<div class="ev-actions">' + action + "</div>" +
-      (isAdmin() ? '<p class="ev-admin"><a href="#admin" data-admin-jump="' + esc(e.id) + '">在管理后台查看报名 →</a></p>' : "");
+      (isAdmin() ? '<p class="ev-admin"><a href="#adm-process" data-admin-jump="' + esc(e.id) + '">在管理后台查看报名 →</a></p>' : "");
   }
   function submitApply(form) {
     var id = form.getAttribute("data-ev"), st = form.querySelector(".modal-status");
@@ -331,8 +351,8 @@
     var list = S.mine.filter(function (a) { return a.status !== "已取消"; });
     box.innerHTML = head + (list.length ? '<div class="mt-list">' + list.map(function (a) {
       var e = a.event || { title: a.eventTitle, category: "其他", date: "", time: "" };
-      var canDeliver = e.ended && ["已报名", "已确认", "已退回", "已交付"].indexOf(a.status) >= 0;
-      var canCancel = !e.ended && ["已报名", "已确认"].indexOf(a.status) >= 0;
+      var canDeliver = isEnded(e) && ["已报名", "已确认", "已退回", "已交付"].indexOf(a.status) >= 0;
+      var canCancel = !isEnded(e) && ["已报名", "已确认"].indexOf(a.status) >= 0;
       return '<article class="mt-item c-' + catKey(e.category) + '"><i class="mt-dot" aria-hidden="true"></i><div class="mt-main">' +
         '<button class="mt-title" type="button" data-ev="' + esc(a.eventId) + '">' + esc(e.title || a.eventTitle) + "</button>" +
         '<p class="mt-meta">' + esc(e.date ? cnDate(e.date, true) : "") + " " + esc(e.time || "") + "</p>" +
@@ -463,9 +483,10 @@
     var acts = [];
     if (x.status === "已报名") acts.push(["已确认", "确认"]);
     if (x.status === "已交付") { acts.push(["已验收", "验收"]); acts.push(["已退回", "退回"]); }
+    if (x.status === "已验收") acts.push(["已交付", "撤销验收"]); // v4.1 polish：验收点错了可以退回「已交付」
     if (x.status === "已退回" || x.status === "已取消") acts.push(["已确认", "恢复为已确认"]);
     if (["已报名", "已确认"].indexOf(x.status) >= 0) acts.push(["已取消", "取消"]);
-    return '<li class="app-row"><div class="app-who"><strong>' + esc(x.name) + "</strong><small>" + esc(x.studentId) + (x.appliedAt ? " · " + esc(x.appliedAt.slice(5)) : "") + "</small></div>" +
+    return '<li class="app-row' + (x.status === "已取消" ? " is-cancel" : "") + '"><div class="app-who"><strong>' + esc(x.name) + "</strong><small>" + esc(x.studentId) + (x.appliedAt ? " · " + esc(x.appliedAt.slice(5)) : "") + "</small></div>" +
       pill(x.status) +
       (x.link ? '<div class="app-deliv"><a href="' + esc(x.link) + '" target="_blank" rel="noopener">网盘 ↗</a>' + (x.code ? '<button class="copy-code" type="button" data-code="' + esc(x.code) + '">提取码 ' + esc(x.code) + "</button>" : "") +
         (x.desc ? "<p>" + esc(x.desc) + "</p>" : "") + (x.caption ? '<p class="cap">✦ ' + esc(x.caption) + "</p>" : "") + (x.submittedAt ? "<small>交付于 " + esc(x.submittedAt) + "</small>" : "") + "</div>" : "") +
@@ -478,10 +499,11 @@
     var F = [["active", "进行中"], ["deliver", "待交付"], ["review", "待验收"], ["all", "全部"], ["cancel", "已取消"]];
     var list = a.events.filter(function (e) {
       var ap = e.applicants || [];
-      if (S.adminFilter === "active") return e.status !== "已取消" && !e.ended;
-      if (S.adminFilter === "deliver") return e.status !== "已取消" && e.ended && ap.some(function (x) { return ["已报名", "已确认", "已退回"].indexOf(x.status) >= 0; });
+      if (S.adminFilter === "active") return e.status !== "已取消" && !isEnded(e);
+      if (S.adminFilter === "deliver") return e.status !== "已取消" && isEnded(e) && ap.some(function (x) { return ["已报名", "已确认", "已退回"].indexOf(x.status) >= 0; });
       if (S.adminFilter === "review") return ap.some(function (x) { return x.status === "已交付"; });
-      if (S.adminFilter === "cancel") return e.status === "已取消";
+      // v4.1 polish：「已取消」= 取消了的任务 + 有人取消了报名的任务（在这里可以恢复报名）
+      if (S.adminFilter === "cancel") return e.status === "已取消" || ap.some(function (x) { return x.status === "已取消"; });
       return true;
     }).filter(function (e) { return !S.adminQuery || (e.title + e.category + e.date).indexOf(S.adminQuery) >= 0; });
     var roster = a.roster || [];
@@ -491,10 +513,10 @@
       }).join("") + '</div><input class="proc-search" type="search" placeholder="搜索任务 / 日期" value="' + esc(S.adminQuery) + '" aria-label="搜索任务" data-proc-search /></div>' +
       (list.length ? '<div class="proc-list">' + list.map(function (e) {
         var ap = (e.applicants || []).filter(function (x) { return x.status !== "已取消"; });
-        var cancelled = (e.applicants || []).length - ap.length;
+        var cancelledApps = (e.applicants || []).filter(function (x) { return x.status === "已取消"; });
         var staff = S.staffing[e.id];
         return '<details class="proc-ev c-' + catKey(e.category) + (e.status === "已取消" ? " is-cancel" : "") + '" data-proc="' + esc(e.id) + '"' + (S.openProc === e.id ? " open" : "") + ">" +
-          '<summary><i class="dot"></i><span class="pe-date">' + esc(cnDate(e.date)) + "<small>" + esc(e.time) + '</small></span><span class="pe-title">' + esc(e.title) + "</span>" +
+          '<summary><i class="dot" aria-hidden="true"></i><span class="pe-date">' + esc(cnDate(e.date)) + "<small>" + esc(e.time) + '</small></span><span class="pe-title">' + esc(e.title) + "</span>" +
           pill(phase(e)) + '<span class="pe-count">' + ap.length + (e.need ? "/" + e.need : "") + " 人</span></summary>" +
           '<div class="pe-body"><div class="pe-tools">' +
           '<button class="button ghost mini" type="button" data-edit="' + esc(e.id) + '">编辑</button>' +
@@ -504,7 +526,8 @@
           '<button class="button ghost mini ai-btn" type="button" data-staff="' + esc(e.id) + '">✦ AI 排班建议</button></div>' +
           (staff ? renderStaff(staff, e) : "") +
           (ap.length ? '<ul class="app-list">' + ap.map(function (x) { return appRow(x, e); }).join("") + "</ul>" : '<p class="adm-empty">还没人报名。</p>') +
-          (cancelled ? '<p class="adm-sub">另有 ' + cancelled + " 人取消了报名。</p>" : "") +
+          (cancelledApps.length ? '<details class="app-cancelled"' + (S.adminFilter === "cancel" ? " open" : "") + '><summary>已取消的报名 ' + cancelledApps.length + " 人 · 可恢复</summary>" +
+            '<ul class="app-list">' + cancelledApps.map(function (x) { return appRow(x, e); }).join("") + "</ul></details>" : "") +
           '<form class="assign" data-assign="' + esc(e.id) + '"><select name="who" aria-label="指派成员"><option value="">指派成员…</option>' +
           roster.map(function (m, i) { return '<option value="' + i + '">' + esc(m.name) + (m.studentId ? "" : "（未填学号）") + "</option>"; }).join("") +
           '</select><button class="button ghost mini" type="submit">指派并确认</button></form>' +
@@ -523,17 +546,37 @@
   function renderRequests() {
     var rq = S.admin.requests || [];
     $("#adm-requests").innerHTML = '<p class="panel-label">Requests</p><h3>拍摄申请 <em class="count">' + rq.length + "</em></h3>" + (rq.length ? '<ul class="req-list">' + rq.map(function (q) {
-      return '<li><div class="rq-main"><strong>' + esc(q.name) + "</strong><small>" + esc(q.date) + "</small><p>" + esc(q.desc) + "</p></div>" +
-        '<div class="rq-acts">' + (q.convertedTo ? '<span class="pill p-ok">已转为任务</span>' :
+      var cas = q.cas || {};
+      var casHint = (cas.c != null || cas.s != null) ? '<p class="rq-cas">转成任务后 CAS 时间为 C ' + esc(cas.taskC) + " · S " + esc(cas.taskS) + (cas.a ? "（申请里的 A " + esc(cas.a) + " 只作参考，任务不记 A）" : "") + "</p>" : "";
+      return '<li><div class="rq-main"><strong>' + esc(q.name) + "</strong><small>" + esc(q.date) + "</small><p>" + esc(q.desc) + "</p>" + casHint + "</div>" +
+        '<div class="rq-acts">' + (q.convertedTo ? pill("已转为任务") :
         '<button class="button ghost mini ai-btn" type="button" data-draft="' + esc(q.id) + '">✦ AI 整理</button><button class="button primary mini" type="button" data-convert="' + esc(q.id) + '">转为任务</button>') + "</div></li>";
     }).join("") + "</ul>" : '<p class="adm-empty">还没有拍摄申请。</p>');
   }
   function setAppStatus(id, to) {
     var note = "";
     if (to === "已退回") { note = window.prompt("退回原因（成员能看到）", "链接打不开 / 缺精选") ; if (note === null) return; }
+    var cur = findApp(id);
+    if (cur && cur.status === "已验收" && to === "已交付" && !window.confirm("撤销验收？这条报名会回到「已交付」，可以重新验收或退回。")) return;
+    if (cur && cur.status === "已取消" && to === "已确认" && !window.confirm("把 " + (cur.name || "这位成员") + " 的报名恢复为「已确认」？")) return;
     O.api("/api/admin/applications/" + id, { method: "PUT", auth: true, body: note ? { status: to, adminNote: note } : { status: to } }).then(function () {
       O.toast("已更新为「" + to + "」"); loadAdmin(); loadEvents();
     }).catch(function (e) { O.toast("操作失败：" + e.message, true); });
+  }
+  function findApp(id) {
+    var hit = null;
+    ((S.admin && S.admin.events) || []).forEach(function (e) { (e.applicants || []).forEach(function (x) { if (x.id === id) hit = x; }); });
+    return hit;
+  }
+  /* v4.1 polish：跳到全流程里的某个任务——切到「全部」、展开、滚到屏幕中间并闪一下 */
+  function focusProc(id) {
+    S.openProc = id; S.adminFilter = "all"; renderProcess();
+    var d = $('[data-proc="' + id + '"]');
+    if (!d) return;
+    d.open = true;
+    if (d.scrollIntoView) d.scrollIntoView({ behavior: "smooth", block: "center" });
+    d.classList.remove("is-flash"); void d.offsetWidth; d.classList.add("is-flash");
+    setTimeout(function () { d.classList.remove("is-flash"); }, 2400);
   }
   function setEventStatus(id, to) {
     if (to === "已取消" && !window.confirm("确定取消这个任务？成员会在日历上看到「已取消」。")) return;
@@ -576,7 +619,9 @@
     f.status.innerHTML = opts.eventStatus.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("");
     data = data || {};
     f.title.value = data.title || ""; f.category.value = data.category || "其他"; f.status.value = data.status || "开放报名";
-    f.date.value = data.date || S.today || ""; f.time.value = data.time != null ? data.time : "11:50-12:20";
+    // v4.1 polish：时间不再预填 11:50-12:20（容易误存），用快捷按钮选或自己填，必填
+    f.date.value = data.date || S.today || ""; f.time.value = data.time || "";
+    syncTimeChips(f);
     f.place.value = data.place || ""; f.need.value = data.need || ""; f.note.value = data.note || "";
     f.casC.value = casNum(data.casC); f.casS.value = casNum(data.casS);
     S.editing = { mode: mode, id: data.id || data.requestId || "" };
@@ -591,6 +636,7 @@
       time: f.time.value.trim(), place: f.place.value.trim(), need: f.need.value === "" ? "" : Number(f.need.value), note: f.note.value.trim(),
       casC: f.casC.value === "" ? 1 : Number(f.casC.value), casS: f.casS.value === "" ? 1 : Number(f.casS.value) };
     if (!body.title || !body.date) { st.textContent = "名称和日期必填"; return; }
+    if (!body.time) { st.textContent = "请选择时间（11:50-12:20 / 放学）或自己填写"; f.time.focus(); return; }
     var casBad = [["C", body.casC], ["S", body.casS]].filter(function (x) { return !(x[1] >= 0.5 && x[1] <= 5 && x[1] * 2 === Math.round(x[1] * 2)); });
     if (casBad.length) { st.textContent = "CAS " + casBad[0][0] + " 应为 0.5–5 小时，0.5 一档"; return; }
     var p = ed.mode === "edit" ? O.api("/api/admin/events/" + ed.id, { method: "PUT", auth: true, body: body })
@@ -603,6 +649,9 @@
       loadAdmin(); loadEvents();
     }).catch(function (e) { st.textContent = "保存失败：" + e.message; });
   }
+  function syncTimeChips(f) {
+    $$("[data-time-pick]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-time-pick") === f.time.value.trim())); });
+  }
   function convertRequest(id, viaAi, btn) {
     var q = null;
     (S.admin.requests || []).forEach(function (x) { if (x.id === id) q = x; });
@@ -610,8 +659,12 @@
     if (!viaAi) {
       var m = String(q.date).match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
       var t = String(q.date).match(/\d{1,2}[:：]\d{2}/);
+      // v4.1 polish：备注去掉联系人 / CAS 行（成员都看得到）；CAS 用申请里的 C / S（服务端已夹到 0.5–5）
+      var cas = q.cas || {};
       openEditor("convert", { requestId: id, title: q.name, date: m ? m[1] + "-" + pad(+m[2]) + "-" + pad(+m[3]) : "", time: t ? t[0] : "",
-        note: String(q.desc).split("\n").filter(function (l) { return l.indexOf("联系人：") !== 0; }).join("\n") }, "从拍摄申请「" + q.name + "」转换，原申请保持不变。");
+        casC: cas.taskC, casS: cas.taskS,
+        note: q.note != null ? q.note : String(q.desc).split("\n").filter(function (l) { return !/^(联系人|联系方式|CAS)[：:]/.test(l.trim()); }).join("\n") },
+        "从拍摄申请「" + q.name + "」转换，原申请保持不变。联系方式不会写进任务备注。");
       return;
     }
     btn.disabled = true; btn.textContent = "AI 整理中…";
@@ -641,7 +694,11 @@
       if ((n = t.closest("[data-cancel]"))) { cancelApp(n.getAttribute("data-cancel")); return; }
       if ((n = t.closest("[data-me-reset]"))) { S.me = {}; try { localStorage.removeItem("oao_me"); } catch (e) {} S.mine = []; renderMine(); return; }
       if ((n = t.closest("[data-admin-jump]"))) {
-        S.openProc = n.getAttribute("data-admin-jump"); S.adminFilter = "all"; O.closeModal($("#event-modal")); renderProcess();
+        ev.preventDefault();
+        var jid = n.getAttribute("data-admin-jump");
+        O.closeModal($("#event-modal"));
+        if (!S.admin) { loadAdmin().then(function () { focusProc(jid); }); return; }
+        setTimeout(function () { focusProc(jid); }, 60);
         return;
       }
       if (!isAdmin()) return;
@@ -656,11 +713,8 @@
       }
       if ((n = t.closest("[data-convert]"))) { convertRequest(n.getAttribute("data-convert"), false); return; }
       if ((n = t.closest("[data-draft]"))) { convertRequest(n.getAttribute("data-draft"), true, n); return; }
-      if ((n = t.closest("[data-adm-open]"))) {
-        S.openProc = n.getAttribute("data-adm-open"); S.adminFilter = "all"; renderProcess();
-        var d = $('[data-proc="' + S.openProc + '"]'); if (d && d.scrollIntoView) d.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
+      if ((n = t.closest("[data-adm-open]"))) { focusProc(n.getAttribute("data-adm-open")); return; }
+      if ((n = t.closest("[data-time-pick]"))) { var tf = $("#edit-form"); tf.time.value = n.getAttribute("data-time-pick"); syncTimeChips(tf); return; }
       if ((n = t.closest(".wk-close"))) { $("#adm-weekly").hidden = true; return; }
     });
     document.addEventListener("toggle", function (ev) {
@@ -673,6 +727,7 @@
         var pm = ev.target.value.match(/[?&]pwd=([A-Za-z0-9]{4})/), cf = ev.target.form.code;
         if (pm && cf && !cf.value) cf.value = pm[1];
       }
+      if (ev.target && ev.target.name === "time" && ev.target.form && ev.target.form.id === "edit-form") syncTimeChips(ev.target.form);
       if (ev.target && ev.target.hasAttribute && ev.target.hasAttribute("data-proc-search")) {
         S.adminQuery = ev.target.value.trim();
         clearTimeout(S.qT); S.qT = setTimeout(function () {

@@ -45,6 +45,12 @@ global.fetch = async (url, opts = {}) => {
     assert.ok(!/wx123/.test(body.messages[0].content), "联系人信息不应发给模型");
     return ok({ choices: [{ message: { content: llmReply } }], usage: { prompt_tokens: 1000, completion_tokens: 100, prompt_cache_hit_tokens: 200, prompt_cache_miss_tokens: 800 } });
   }
+  const sm = u.match(/tables\/(\w+)\/records\/search$/);
+  if (sm) {
+    const conds = (JSON.parse(opts.body).filter || {}).conditions || [];
+    const items = (db[sm[1]] || []).filter((r) => conds.every((c) => String(r.fields[c.field_name] || "") === String(c.value[0])));
+    return ok({ code: 0, data: { items } });
+  }
   const m = u.match(/tables\/(\w+)\/records(?:\/(rec\w+))?(\?.*)?$/);
   if (m) {
     const t = db[m[1]];
@@ -214,6 +220,93 @@ const call = (method, path, body, token, query) => api.handle({
     assert.strictEqual((await call("PUT", "/api/admin/events/" + evCas.record_id, { casC: 2 }, "member-token")).status, 403);
   }
 
+  /* 7c) v4.1 polish */
+  {
+    const P = api._v4;
+    // —— 邀请拍摄：服务端统一标记，不信任前端的状态；不上公开时间线；在后台列表里 —— //
+    r = await call("POST", "/api/request", { name: "【测试】话剧社公演", date: "2026.12.05 18:30", desc: "舞台跟拍", contact: "陈老师 · 微信 cx-777", casC: 2, casA: 1, casS: 7, status: "已归档" });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    const rq = db.tbl_act.find((x) => x.fields.活动名称 === "【测试】话剧社公演");
+    assert.strictEqual(rq.fields.来源, "邀请拍摄"); assert.strictEqual(rq.fields.状态, "待处理申请", "不信任前端传来的状态");
+    assert.ok(rq.fields.描述.includes("联系人：陈老师") && rq.fields.描述.includes("CAS：C 2 / A 1 / S 7"));
+    assert.strictEqual((await call("POST", "/api/request", { name: "" })).status, 400, "活动名称必填");
+    r = await call("GET", "/api/activities");
+    const pub = r.body.items.map((x) => x.fields.活动名称);
+    assert.ok(pub.includes("普通活动"), "普通活动在公开时间线");
+    assert.ok(!pub.includes("【测试】话剧社公演") && !pub.includes("音乐剧公演") && !pub.includes("Test"), "申请（新标记 + 旧格式）都不在公开时间线");
+    assert.ok(!JSON.stringify(r.body).includes("cx-777") && !JSON.stringify(r.body).includes("wx123"), "公开接口不泄露联系方式");
+    r = await call("GET", "/api/admin/overview", null, "admin-token");
+    const ar = r.body.requests.find((x) => x.name === "【测试】话剧社公演");
+    assert.ok(ar, "后台拍摄申请列表里有新申请");
+    assert.strictEqual(ar.cas.taskC, 2); assert.strictEqual(ar.cas.taskS, 5, "S 7 夹到 5"); assert.strictEqual(ar.cas.a, 1);
+    assert.ok(!ar.note.includes("cx-777") && !ar.note.includes("CAS"), "预填备注去掉联系人和 CAS 行");
+    assert.strictEqual(r.body.stats.activities, db.tbl_act.filter((x) => !P.isShootRequest(x)).length, "后台「活动记录」数不含申请");
+    // 转任务：备注干净，CAS 来自申请（C 2 → 2，S 7 → 5）
+    r = await call("POST", "/api/admin/requests/" + rq.record_id + "/convert", { category: "其他", time: "18:30-20:00" }, "admin-token");
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.item.casC, 2); assert.strictEqual(r.body.item.casS, 5);
+    assert.ok(!/cx-777|联系人|CAS/.test(r.body.item.note), "任务备注里没有联系方式 / CAS 行：" + r.body.item.note);
+    assert.strictEqual(r.body.item.note, "舞台跟拍");
+    // 编辑器传来的备注里如果还有联系人行，也会被去掉
+    const rq2 = add("tbl_act", { 活动名称: "旧格式申请", 日期: "2026.12.06", 描述: "合影\n联系人：赵同学 13800000000\nCAS：C 0.3 / A 0 / S 0" });
+    r = await call("POST", "/api/admin/requests/" + rq2.record_id + "/convert", { note: "合影\n联系人：赵同学 13800000000" }, "admin-token");
+    assert.strictEqual(r.body.item.note, "合影"); assert.strictEqual(r.body.item.casC, 0.5, "C 0.3 → 0.5"); assert.strictEqual(r.body.item.casS, 1, "S 0 → 默认 1");
+    // 纯函数
+    assert.strictEqual(P.casFromRequest(1.26), 1.5); assert.strictEqual(P.casFromRequest(null), 1); assert.strictEqual(P.casFromRequest("abc"), 1);
+    assert.strictEqual(P.casFromRequest(9), 5); assert.strictEqual(P.casFromRequest(0.1), 0.5);
+    assert.deepStrictEqual(P.parseRequestCas("x\nCAS：C 1.5 / A 2 / S 0"), { c: 1.5, a: 2, s: 0 });
+    assert.strictEqual(P.stripContact("a\n联系人：x\nCAS：C 1 / A 0 / S 1\nb"), "a\nb");
+    global.__polishReq = rq.record_id;
+
+    // —— 交付：任务时间没到，但管理员标了「已结束」→ 可以交付 —— //
+    const evEarly = add("tbl_ev", { 名称: "【测试】提前结束", 类别: "其他", 日期: day(2), 时间: "15:30", 状态: "开放报名" });
+    r = await call("POST", "/api/admin/applications", { eventId: evEarly.record_id, name: "甲", studentId: "TEST9999" }, "admin-token");
+    const appE = r.body.item;
+    const dl = { studentId: "TEST9999", link: "https://pan.baidu.com/s/1abcDEF", code: "ab12", desc: "提前结束的素材" };
+    assert.strictEqual((await call("POST", "/api/applications/" + appE.id + "/deliver", dl, "member-token")).status, 409, "没结束不能交付");
+    r = await call("GET", "/api/events");
+    assert.strictEqual(r.body.items.find((e) => e.id === evEarly.record_id).ended, false);
+    await call("PUT", "/api/admin/events/" + evEarly.record_id, { status: "已结束" }, "admin-token");
+    r = await call("GET", "/api/events");
+    assert.strictEqual(r.body.items.find((e) => e.id === evEarly.record_id).ended, true, "已结束 = ended");
+    r = await call("POST", "/api/applications/" + appE.id + "/deliver", dl, "member-token");
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body)); assert.strictEqual(r.body.item.status, "已交付");
+    // 单个时间「15:30」= 1 小时
+    const w1 = P.eventWindow("2026-10-21", "15:30");
+    assert.strictEqual(w1.end - w1.start, 3600e3);
+    assert.strictEqual(P.isEnded("开放报名", w1.end, w1.end - 1), false); assert.strictEqual(P.isEnded("开放报名", w1.end, w1.end), true);
+    assert.strictEqual(P.isEnded("已结束", w1.end, 0), true);
+
+    // —— 验收可以撤销（回到已交付），已取消的报名可以恢复为已确认 —— //
+    r = await call("PUT", "/api/admin/applications/" + appE.id, { status: "已验收" }, "admin-token");
+    assert.strictEqual(r.body.item.status, "已验收");
+    r = await call("PUT", "/api/admin/applications/" + appE.id, { status: "已交付" }, "admin-token");
+    assert.strictEqual(r.body.item.status, "已交付", "撤销验收");
+    r = await call("GET", "/api/admin/overview", null, "admin-token");
+    const cancelled = r.body.events.find((e) => e.id === evFuture.record_id).applicants.find((a) => a.status === "已取消");
+    assert.ok(cancelled, "后台数据里保留已取消的报名（前端在「已取消」里展示）");
+    r = await call("PUT", "/api/admin/applications/" + cancelled.id, { status: "已确认" }, "admin-token");
+    assert.strictEqual(r.body.item.status, "已确认", "恢复为已确认");
+
+    // —— 上传到新活动名：自动新建活动，照片数 = 1；再传一次 +1；同名申请不算活动 —— //
+    r = await call("POST", "/api/photos", { activity: "【测试】新活动", link: "https://pan.baidu.com/s/1abcDEF" }, "member-token");
+    assert.strictEqual(r.status, 200); assert.strictEqual(r.body.activityCreated, true);
+    let act = db.tbl_act.filter((x) => x.fields.活动名称 === "【测试】新活动");
+    assert.strictEqual(act.length, 1); assert.strictEqual(act[0].fields.照片数, 1); assert.strictEqual(act[0].fields.来源, "成员录入");
+    r = await call("POST", "/api/photos", { activity: "【测试】新活动", link: "https://pan.baidu.com/s/1abcDEG" }, "member-token");
+    assert.strictEqual(r.body.activityCreated, false); assert.strictEqual(act[0].fields.照片数, 2);
+    r = await call("POST", "/api/photos", { activity: "【测试】话剧社公演", link: "https://pan.baidu.com/s/1abcDEH" }, "member-token");
+    assert.strictEqual(r.body.activityCreated, true, "同名的邀请拍摄申请不被当成活动");
+    assert.strictEqual(rq.fields.照片数, undefined, "申请本身不被改动");
+    r = await call("GET", "/api/activities");
+    assert.ok(r.body.items.some((x) => x.fields.活动名称 === "【测试】话剧社公演" && x.fields.来源 === "成员录入"));
+
+    // —— AI 分组只给管理员 —— //
+    r = await call("POST", "/api/group", { groupCount: 2 }, "member-token");
+    assert.strictEqual(r.status, 403); assert.strictEqual(r.body.code, "ADMIN_ONLY");
+    assert.strictEqual((await call("POST", "/api/group", { groupCount: 2 })).status, 401);
+  }
+
   /* 8) AI：成员可润色；记账；预算/次数守卫 */
   r = await call("POST", "/api/ai/caption", { desc: "冲刺瞬间，阳光很好" });
   assert.strictEqual(r.status, 401);
@@ -234,7 +327,7 @@ const call = (method, path, body, token, query) => api.handle({
   assert.strictEqual(llmCalls, before, "超预算不调模型");
   // 停用线不能高于上限：AI_STOP_AT_CNY=25 时按上限 20 算
   db.tbl_ai[0].fields.费用元 = 19.995;
-  const low = await api.handle({ method: "POST", path: "/api/group", headers: { authorization: "Bearer member-token" }, body: JSON.stringify({ groupCount: 2 }) }, { ...ENV, AI_MONTHLY_CAP_CNY: "20", AI_STOP_AT_CNY: "25" });
+  const low = await api.handle({ method: "POST", path: "/api/group", headers: { authorization: "Bearer admin-token" }, body: JSON.stringify({ groupCount: 2 }) }, { ...ENV, AI_MONTHLY_CAP_CNY: "20", AI_STOP_AT_CNY: "25" });
   assert.strictEqual(low.statusCode, 429, "停用线不能高于上限");
   db.tbl_ai[0].fields.费用元 = 0.01;
   r = await call("POST", "/api/admin/ai/weekly", {}, "admin-token");
@@ -257,6 +350,10 @@ const call = (method, path, body, token, query) => api.handle({
   r = await call("POST", "/api/admin/ai/draft", { requestId: reqId }, "admin-token");
   assert.strictEqual(r.status, 200); assert.strictEqual(r.body.draft.category, "其他"); assert.strictEqual(r.body.draft.need, 3);
   assert.strictEqual(r.body.draft.casC, 1); assert.strictEqual(r.body.draft.casS, 1, "AI 草稿的 CAS 默认 1/1");
+  // v4.1 polish：申请里填了 C / S 时，AI 草稿的 CAS 用申请的值（S 7 夹到 5）
+  await new Promise((res) => setTimeout(res, 4100)); // 同功能 4 秒冷却
+  r = await call("POST", "/api/admin/ai/draft", { requestId: global.__polishReq }, "admin-token");
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body)); assert.strictEqual(r.body.draft.casC, 2); assert.strictEqual(r.body.draft.casS, 5);
 
   /* 9) 纯函数 */
   assert.ok(_v4.validBaiduLink("https://pan.baidu.com/s/1AbC-dEf_12"));

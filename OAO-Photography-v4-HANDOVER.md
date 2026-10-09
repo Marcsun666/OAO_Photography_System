@@ -1,9 +1,9 @@
 # OAO Photography Club (OAO 摄影社) website: v4 handover
 
-> **v4.1 LIVE in production (2026-10-09):** CAS 时间 on tasks + clearer 邀请拍摄 copy. Cloudflare deployment **`caccbb28-9462-42eb-8339-7f0e1f58dee5`**, git `main` / tag `v4.1`. **Rollback:** v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1). The v4.1 preview stays at <https://v41.oao-photography.pages.dev>. See **§18**. The v4 notes below describe the base that v4.1 extends.
+> **v4.1 (polish) LIVE in production (2026-10-09):** CAS 时间 on tasks, 邀请拍摄 kept off the public site, delivery opens on 已结束, admin-only AI 分组 and a UI consistency pass. Cloudflare deployment **`7d104a88-1116-4c69-a858-375ded02409d`**, git `main` / tag `v4.1` (moved to the polish commit). **Rollback:** the pre-polish v4.1 deployment `caccbb28-9462-42eb-8339-7f0e1f58dee5` (git tag `v4.1-backup`, files in `/workspace/backups/v4.1-2026-10-09/deploy`), see §18.7. Older rollback: v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1). The v4.1 preview stays at <https://v41.oao-photography.pages.dev>. See **§18**. The v4 notes below describe the base that v4.1 extends.
 > **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09):** v4 went live as Cloudflare deployment `522b752c` (git tag `v4`) and was superseded the same day by **v4.1** (deployment `caccbb28`, git `main` / tag `v4.1`). The v4 preview remains at <https://v4.oao-photography.pages.dev> (Pages branch `v4`). **Rollback:** v3 deployment `0d0d5be2` (git tag `v3`); see §17.8. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
 > **Live URL (v4 since 2026-10-09):** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
-> **Source:** the GitHub repo `Marcsun666/OAO_Photography_System` (public): `main` and tag `v4.1` = live; tag `v4` = v4 (rollback target `522b752c`); tag `v3` = previous production (rollback); tag/branch `v2` = older (see §11).
+> **Source:** the GitHub repo `Marcsun666/OAO_Photography_System` (public): `main` and tag `v4.1` = live (v4.1 polish); tag `v4.1-backup` = v4.1 before the polish; tag `v4` = v4 (rollback target `522b752c`); tag `v3` = previous production (rollback); tag/branch `v2` = older (see §11).
 > **Language:** this doc is in English. Chinese UI text and Feishu table/field names are quoted exactly. Never translate them in code.
 
 ---
@@ -210,7 +210,7 @@ Set them with `wrangler pages secret put NAME --project-name oao-photography`. *
 | `TABLE_EVENTS` | **v4** 拍摄任务 table id | `tbliKFLeS4KfLGKO` |
 | `TABLE_APPLICATIONS` | **v4** 报名与交付 table id | `tblzwdHHFJNRm1eA` |
 | `TABLE_AI_USAGE` | **v4** AI用量 table id. **Required for any AI call in v4** (incl. AI 分组): no table → no spend tracking → AI refused | `tblhaJ6i2hU8bWo1` |
-| `ADMIN_PASSCODE` | **v4** admin code typed into the normal 成员登录 box | `<ask owner>` (format `OAO-ADMIN-XXXX-XXXX-XXXX`) |
+| `ADMIN_PASSCODE` | **v4** admin code typed into the normal 成员登录 box | `<ask owner>` (format: `oao-admin-` followed by 6 digits; the value is never written in this doc or the repo) |
 | `ADMIN_TOKEN` | **v4** bearer token returned for the admin code; the only thing that unlocks `/api/admin/*` | `<regenerate>` (random; must differ from `MEMBER_TOKEN`) |
 | `AI_MONTHLY_CAP_CNY`, `AI_STOP_AT_CNY` | **v4** optional budget overrides | not set; defaults 20 and 18 (stop line = min(cap, AI_STOP_AT_CNY or 0.9×cap)) |
 
@@ -495,6 +495,9 @@ Use this only if needed. It requires Tencent real-name verification, which the o
   - Added `tools/feishu/*` and `tools/build-deploy.sh`; SETUP.md has the 2A/2B sections.
   - Verified end to end: every route, uploads of 676 B, 3.3 MB and 8 MB with byte-identical download, one real DeepSeek call, and headless Chrome showing live data with no demo badge.
 - **v3: style and flow refinement**, 2026-10-08 to 2026-10-09. Three review rounds on a preview, then approved by the owner and **promoted to production on 2026-10-09** (deployment `0d0d5be2`; git `main` fast-forwarded to `v3`, tag `v3`). See §16.
+- **v4: calendar + 报名/交付, hidden admin dashboard, AI budget**, 2026-10-09 (deployment `522b752c`, tag `v4`). See §17.
+- **v4.1: CAS 时间 + 邀请拍摄 copy**, 2026-10-09 (deployment `caccbb28`, tag `v4.1-backup`). See §18.1–18.6.
+- **v4.1 polish**, 2026-10-09 (deployment `7d104a88`, tag `v4.1`). See §18.7 and `CHANGELOG.md`.
 
 ---
 
@@ -516,7 +519,7 @@ rm cj.txt
 
 **In a browser:**
 1. Log in. There should be **no** 演示模式 badge, and the timeline, library and Bilibili area should load from Feishu.
-2. Click 成员登录 and enter the passcode. The button should read 退出 · 已登录 and ＋ 上传 / 贴链接 should appear.
+2. Click 成员登录 and enter the passcode. The button should read 「退出登录」 and ＋ 上传 / 贴链接 should appear.
 3. Upload a small photo and check that it shows in 照片合集.
 4. In 成员资料与技能, run AI 分组 with 2 groups (it needs at least 2 members registered).
 5. Delete test rows in Feishu afterwards.
@@ -858,7 +861,7 @@ Then run the §14 checks plus: admin passcode → 管理 appears; `/api/admin/ov
 
 ---
 
-## 18. v4.1 (LIVE in production since 2026-10-09, deployment `caccbb28`): CAS 时间 on tasks + 邀请拍摄 copy
+## 18. v4.1 (LIVE in production since 2026-10-09; deployment `caccbb28`, replaced the same day by the v4.1 polish deployment `7d104a88`, see §18.7): CAS 时间 on tasks + 邀请拍摄 copy
 
 **Status: LIVE in production** since 2026-10-09 (owner approved): Cloudflare deployment **`caccbb28-9462-42eb-8339-7f0e1f58dee5`** (branch `main`, source commit `4beba1d`) at <https://oao-photography.pages.dev>. Git: `main` fast-forwarded to `v4.1`, tag **`v4.1`**, `deploy/` = the v4.1 build. The preview stays at <https://v41.oao-photography.pages.dev>. **Rollback:** v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1, §18.6).
 
@@ -926,4 +929,111 @@ No production secret changes are needed. Rollback: §18.1.
 - Rollback (if ever needed): Cloudflare dashboard → Deployments → `522b752c` → Rollback, or `npx wrangler@4 pages deploy /workspace/backups/v4.0-2026-10-09/deploy --project-name oao-photography --branch main --commit-dirty=true`; then point the git docs back at tag `v4`.
 
 Note: GitHub reports the repo `Marcsun666/OAO_Photography_System` as **public** (older sections of this doc say private). It contains no secrets, but it does document the Base app_token and table ids. Never commit `/workspace/backups/`.
+
+### 18.7 v4.1 polish (LIVE 2026-10-09, deployment `7d104a88`)
+
+Still called **v4.1**. This is a refinement pass on the same design language (Apple-like, liquid glass, light/dark auto). No features were removed. Changelog: root `CHANGELOG.md`.
+
+**Status.**
+- Production deployment: **`7d104a88-1116-4c69-a858-375ded02409d`** (branch `main`) at <https://oao-photography.pages.dev>.
+- Preview: <https://v41.oao-photography.pages.dev> (deployment `17244b10`, same build).
+- Git: `main` and tag **`v4.1`** were force-moved to the polish commit. `deploy/` is the polish build.
+- **Rollback target:** the pre-polish v4.1 deployment **`caccbb28-9462-42eb-8339-7f0e1f58dee5`** (git tag `v4.1-backup` = `d80fe41`). Use Cloudflare dashboard → Deployments → `caccbb28` → Rollback, or run `WRANGLER_CACHE_DIR=/tmp/wcache npx wrangler@4 pages deploy /workspace/backups/v4.1-2026-10-09/deploy --project-name oao-photography --branch main --commit-dirty=true`. The Feishu changes below are additive, so the old build keeps working on the new schema. It just stops hiding 邀请拍摄 rows.
+- **Backup taken first:** `/workspace/backups/v4.1-2026-10-09/` (chmod 700, never commit). It contains `deploy/`, `source-tree/` (git archive of `d80fe41`), `feishu/*.json` (all 8 tables at 0/0/0/4/2/29/1/4 records) and `ROLLBACK.md`.
+
+**Feishu schema (additive; applied live with `tools/feishu/setup_tables.py`).**
+- 活动记录.状态 gets a new option `待处理申请`.
+- New single-select field 活动记录.`来源`, with options `成员录入` / `邀请拍摄`.
+- `setup_tables.py` now adds missing select options to existing fields and keeps the existing options and their ids.
+- `tools/feishu/migrate_requests.py [--dry-run]` tags old request rows: rows with no 来源 whose 描述 has a `联系人：` or `CAS：` line become 来源=邀请拍摄 and 状态=待处理申请. A live run found 0 rows (活动记录 is empty).
+
+**Fixes.**
+1. **Mobile tab bar.** The centre 邀请拍摄 tab is now always a solid pill: a graphite gradient with white text in light mode, `#f5f5f7` with black text in dark mode. It stays that way in `.active` and `.on-dark`; active adds an outer ring. The cause was `.tab-bar a.active { background: rgba(255,255,255,.24) !important }` overriding it. Under contrast-more the pill gets an outline.
+2. **Modals and sheets.**
+   - The scrim is `--p-scrim` with `blur(24px)`.
+   - The card is `--p-sheet`: light `rgba(251,251,253,.93)`, dark `rgba(28,28,30,.93)`, with `blur(36px)`, keeping the glass rim.
+   - Fields use `--p-field`.
+   - Under reduce-transparency the cards and scrim are solid.
+3. **Hero stats** never show `0`:
+   - Upcoming tasks (not cancelled and not ended) show `个拍摄任务待开拍`, or `—` with 近期暂无拍摄任务.
+   - Photos are `max(Σ 照片数, photo rows)`, or 照片素材整理中.
+   - Links show the count, or 作品链接即将上线.
+   - The last tile is 26-27 招新进行中.
+   - While loading the values show `…`.
+4. **邀请拍摄 kept off the public site.**
+   - `POST /api/request` always writes 状态=待处理申请, 来源=邀请拍摄 and ignores any status the client sends. It requires a name and stores the contact and CAS as `联系人：…` / `CAS：C x / A y / S z` lines in 描述.
+   - `GET /api/activities` (public) filters requests out using `isShootRequest`. That checks 来源 first and falls back to the legacy line format, so contact info never reaches the public timeline, stats or workspace.
+   - The admin overview's `stats.activities` also excludes requests.
+   - The admin 拍摄申请 list is unchanged and now also carries `note` (stripped) and `cas`.
+5. **Convert request → task.**
+   - The task 备注 is `stripContact(...)`, which drops 联系人 / 联系方式 / 联系 / CAS lines, even when the editor sends them back.
+   - CAS-C and CAS-S are prefilled from the request's C and S, rounded to 0.5 steps and clamped to 0.5–5, with a default of 1. Example: C 7 → 5, S 0.3 → 0.5.
+   - A stays reference only, and the request card says so: 「转成任务后 CAS 时间为 C x · S y（申请里的 A … 只作参考）」.
+   - The AI draft uses the same CAS values.
+6. **Delivery opens** when the task time has passed **or** an admin sets 已结束. One rule, `isEnded`, is used by both the server and `events.js`, and `/api/events` returns `ended`. The member hint was updated to match.
+7. **恢复为已确认** works for cancelled applications. They are listed in a collapsible 「已取消的报名」 block under each task (open under the 已取消 filter, which now also includes tasks that have cancelled applications), and the action asks for confirmation.
+8. **「在管理后台查看报名 →」** closes the modal, loads the admin area if needed, switches the filter to 全部, opens the task, scrolls it to the centre and flashes it for 2.4 s (an outline instead under reduced-motion).
+9. **Upload to a new activity name** creates the activity, because `ensureActivityAndCount` is member-authed and server-side:
+   - It creates `日期 YYYY.MM`, 照片组, 待选片, 其他, 照片数 1, 来源 成员录入.
+   - An existing activity gets 照片数 + 1, so 照片数 stays consistent.
+   - Requests with the same name are never matched.
+   - The window shows a live hint (existing vs. 将新建), and the toast mentions the new activity.
+10. **Smaller fixes.**
+    - Task editor: the time is no longer prefilled. It has quick-pick chips (`11:50-12:20 午休`, `放学 15:30-17:30`) and is required in the UI.
+    - 已验收 can be undone (「撤销验收」 → 已交付, after a confirm).
+    - **AI 分组 is admin-only**: the server returns 403 `ADMIN_ONLY` for members, and the button is disabled with a hint.
+    - The login modal mentions 报名.
+    - Phone calendar: empty weeks that are already over are hidden; the current and future empty weeks show 「本周暂无任务」.
+    - This doc: the button reads 「退出登录」, and the admin passcode format is described (value never written).
+
+**Consistency pass (every change).**
+- **Status colours are one map (`PILL` in `events.js`):**
+  - blue = 开放报名 / 已报名
+  - green = 已安排 / 已确认 / 已转为任务
+  - orange = 已交付
+  - purple = 已验收
+  - red = 已退回
+  - grey = 已结束
+  - grey with strikethrough = 已取消
+  - yellow = 待处理申请
+  - Cancelled stack bars changed from red to hatched grey to match.
+- **Naming:**
+  - Footer 加入我们 → 加入 (same as the nav).
+  - Mobile tab 成员 → 成员区 (same as the nav).
+  - Events eyebrow "Calendar Feel" → "Club Life".
+  - Member tile 「登记技能，一键分组」 → 「登记技能 · 管理员分组」.
+  - Member lede says 报名/交付 live in the calendar.
+  - Request CAS legend says whose CAS it is, and the inputs are capped at 5.
+  - Upload label 「所属活动（选择已有，或输入新名称自动新建）」.
+  - The request success message says OAO will contact the requester.
+- **Empty states** use one tone ("还没有… + what to do next"), and the static HTML matches the JS text:
+  - photo collection 「还没有可展示的照片。成员登录后可以直接上传。」
+  - library 「素材库还是空的。…」
+  - roster 「还没有人登记资料。填好上面的成员资料表就能加入名册。」
+  - workspace week text
+  - calendar 「本周暂无任务」
+- **Buttons:** confirm dialogs for the reversing actions (撤销验收, 恢复为已确认); `#group-run:disabled` has a proper disabled style.
+- **Spacing and parity:** time chips, field hints, the CAS hint and the cancelled block use the existing spacing scale. Every new style has a dark-mode variant and a reduce-transparency / reduced-motion fallback, and the accessibility tail stays last in `styles.css`.
+
+**Tests.** All 6 test files pass. New coverage:
+- request marking and public filtering, with no contact leak
+- convert note stripping and CAS clamping
+- AI draft CAS
+- 已结束 → delivery (409 before, 200 after)
+- undo 验收 and restoring a cancelled application
+- automatic activity creation on upload
+- AI 分组 403 for members
+- empty weeks and `pillClass`
+- schema, SETUP and DOM contract checks
+
+**Live checks.**
+- **v41 preview (2026-10-09): 51/51 checks passed.** One more check failed, but the fault was in the check script (it used the wrong query parameter for `/api/my`). It passed after the fix.
+  - Lock / health / 29 events with CAS and `ended`.
+  - Member / admin roles; admin 401/403/200; AI 分组 403 for members, 401 without a login.
+  - A 【测试】 request was absent from `/api/activities` and present in the admin list with CAS prefill 5/0.5 and a clean note. It converted into a task with a clean note and C 5 / S 0.5.
+  - A temporary 【测试】 task with 学号 TEST9999: deliver 409 → 已结束 → 200; 验收 → 撤销 → 取消 → 恢复为已确认.
+  - All 4 test records were deleted through the Feishu API, and the record counts went back to the backup (0/0/0/4/2/29/1/4).
+- **Production (read-only): 24/24 passed.** The check script is at `/workspace/oao-tools/live_check.py`; it reads secrets from env and the box file and never prints them.
+
+**Screenshots.** `/workspace/v41p-shots/` (not in git) covers 1280/390 × light/dark: hero, tab bar on 邀请拍摄 (plus `.on-dark` crops), task modal, admin editor, timeline, calendar and login modal. It also has a reduce-transparency set at 390.
 

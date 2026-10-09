@@ -68,4 +68,21 @@ assert.strictEqual((octCas.match(/CAS 时间 C /g) || []).length, 48, "桌面格
 assert.ok(octCas.includes("CAS 时间 C 1.5 · S 2"), "格子提示显示飞书里改过的值");
 assert.strictEqual((octCas.match(/class="cal-ev /g) || []).length, 24, "加 CAS 不改变格子数量");
 
-console.log("✅ v4 日历渲染测试通过（29 个任务、期中考试标注、议程、转义、v4.1 CAS 时间）");
+/* v4.1 polish：空周 / 状态颜色 / 已结束 */
+{
+  const one = [{ id: "a", title: "唯一任务", date: "2026-10-28", time: "15:30", category: "其他", status: "开放报名" }];
+  const ag = cal.renderAgendaHTML(2026, 10, one, "2026-10-14", {});
+  assert.ok(!ag.includes("10月1日 –") && !ag.includes("10月5日 –"), "已经过去的空周不显示");
+  assert.ok(ag.includes("本周暂无任务"), "本周 / 以后的空周显示「本周暂无任务」");
+  assert.ok(ag.includes("唯一任务"));
+  assert.ok(!cal.renderAgendaHTML(2026, 9, one, "2026-10-14", {}).includes("本周暂无任务"), "过去的月份不出现空周提示");
+  const pc = cal.pillClass;
+  assert.strictEqual(pc("已取消"), "p-cancel"); assert.strictEqual(pc("待处理申请"), "p-request");
+  assert.strictEqual(pc("已结束"), "p-muted"); assert.notStrictEqual(pc("已验收"), pc("已交付"));
+  assert.strictEqual(pc("已安排"), pc("已确认"), "同为绿色");
+  const now = Date.parse("2026-10-14T08:00:00Z"); // 北京 16:00
+  assert.strictEqual(cal.isEnded({ end: now + 864e5, status: "已结束" }, now), true, "标记已结束即视为结束");
+  assert.strictEqual(cal.isEnded({ end: now + 864e5, status: "开放报名" }, now), false);
+  assert.strictEqual(cal.isEnded({ end: now - 1, status: "开放报名" }, now), true, "时间已过");
+}
+console.log("✅ v4 日历渲染测试通过（29 个任务、期中考试标注、议程、转义、v4.1 CAS 时间、空周、状态色）");

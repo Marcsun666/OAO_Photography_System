@@ -1,4 +1,4 @@
-"""Create / repair the 5 OAO tables in a Feishu Base. Idempotent: safe to re-run.
+"""Create / repair the 8 OAO tables in a Feishu Base. Idempotent: safe to re-run.
 
   export FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=...      # never commit these
   export BITABLE_APP_TOKEN=xxxx      # or: export WIKI_NODE_TOKEN=xxxx (Base inside a wiki)
@@ -63,5 +63,18 @@ for name, fields in SPEC.items():
         if f["field_name"] not in have:
             ok(req("POST", f"/bitable/v1/apps/{A}/tables/{tid}/fields", f, t), "add field " + f["field_name"])
             print(name, "added field", f["field_name"])
+    # v4.1 polish: add missing options to existing single-select fields (existing options and their ids are kept)
+    by_name = {f["field_name"]: f for f in cur}
+    for f in fields:
+        g = by_name.get(f["field_name"])
+        if f["type"] != 3 or not g or g["type"] != 3:
+            continue
+        opts = (g.get("property") or {}).get("options") or []
+        names_have = {o["name"] for o in opts}
+        missing = [o for o in f["property"]["options"] if o["name"] not in names_have]
+        if missing:
+            body = {"field_name": g["field_name"], "type": 3, "property": {"options": opts + missing}}
+            ok(req("PUT", f"/bitable/v1/apps/{A}/tables/{tid}/fields/{g['field_id']}", body, t), "add options " + g["field_name"])
+            print(name, g["field_name"], "added options", [o["name"] for o in missing])
 
 import verify  # noqa: E402  (prints the schema check + env lines, writes feishu-tables.json)

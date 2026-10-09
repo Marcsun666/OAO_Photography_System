@@ -20,7 +20,7 @@
     activity: {
       name: "活动名称", date: "日期", unit: "组别", status: "状态", type: "类型",
       photoCount: "照片数", videoCount: "视频数", desc: "描述", cover: "封面",
-      link: "网盘链接", code: "提取码",
+      link: "网盘链接", code: "提取码", source: "来源",
     },
     photo: {
       activity: "活动", file: "文件", link: "网盘链接", code: "提取码",
@@ -45,6 +45,7 @@
     links: [],
     members: [],
     skills: [],
+    upcoming: null, // v4.1 polish：待开拍的拍摄任务数（events.js 加载日历后告诉这里）
   };
 
   /* 可选技能词条。加词条只改这里，界面自动跟着变。 */
@@ -290,6 +291,12 @@
     var entry = el("#upload-entry");
     if (toggle) toggle.textContent = state.token ? "退出登录" : "成员登录";
     if (entry) entry.hidden = !state.token;
+    // v4.1 polish：AI 分组只给管理员（服务端同样强制 403）；成员看到按钮但是灰的，旁边有说明
+    var isAdmin = !!state.token && state.role === "admin";
+    var gr = el("#group-run");
+    if (gr) gr.disabled = !isAdmin && !DEMO;
+    var gh = el("#group-admin-hint");
+    if (gh) gh.hidden = isAdmin || DEMO;
     // v3：成员工作区按登录态切换（锁定提示 / 快捷操作）
     if (document.body && document.body.classList) {
       document.body.classList.toggle("is-member", !!state.token);
@@ -377,16 +384,23 @@
   }
 
   /* ---------------------------- 渲染 ---------------------------- */
-  function renderHeroStats(acts) {
+  /* v4.1 polish：首屏统计改成三个总是有意义的数——待开拍的拍摄任务、照片素材、作品链接。
+   * 数为 0 时不显示「0」，而是「—」加一句友好的说明；任务数还没加载时显示「…」。 */
+  function statCell(n, label, zeroLabel) {
+    if (n == null) return '<div class="is-pending"><strong>…</strong><span>' + esc(label) + "</span></div>";
+    if (!n) return '<div class="is-zero"><strong>—</strong><span>' + esc(zeroLabel) + "</span></div>";
+    return "<div><strong>" + n + "</strong><span>" + esc(label) + "</span></div>";
+  }
+  function renderHeroStats() {
     var rail = el("#stat-rail");
     if (!rail) return;
     if (rail.classList) rail.classList.remove("is-loading");
-    var totalPhotos = acts.reduce(function (s, a) { return s + num(a.fields, F.activity.photoCount); }, 0);
-    var totalVideos = acts.reduce(function (s, a) { return s + num(a.fields, F.activity.videoCount); }, 0);
+    var counted = state.activities.reduce(function (s, a) { return s + num(a.fields, F.activity.photoCount); }, 0);
+    var photos = Math.max(counted, state.photos.length);
     rail.innerHTML =
-      "<div><strong>" + acts.length + "</strong><span>场校内外拍摄</span></div>" +
-      "<div><strong>" + totalPhotos + "</strong><span>张照片素材</span></div>" +
-      "<div><strong>" + totalVideos + "</strong><span>条视频素材</span></div>" +
+      statCell(state.upcoming, "个拍摄任务待开拍", "近期暂无拍摄任务") +
+      statCell(photos, "份照片素材", "照片素材整理中") +
+      statCell(state.links.length, "条作品链接", "作品链接即将上线") +
       "<div><strong>26-27</strong><span>招新进行中</span></div>";
   }
 
@@ -423,7 +437,7 @@
         .filter(Boolean).slice(0, 3);
       var text = recent.length
         ? recent.join("、") + "，按最新日期优先。"
-        : "暂无进行中的记录任务，登录后开始录入。";
+        : "还没有进行中的记录任务。成员登录后可以上传素材开始记录。";
       week.innerHTML =
         '<p class="panel-label">This week</p><h3>本周记录任务</h3><p>' + esc(text) + "</p>";
     }
@@ -567,7 +581,7 @@
   }
 
   function renderAll() {
-    renderHeroStats(state.activities);
+    renderHeroStats();
     renderWorkspace(state.activities);
     renderTimeline(state.activities);
     renderLibrary(state.photos);
@@ -583,6 +597,21 @@
       var n = str(a.fields, F.activity.name);
       return n ? '<option value="' + esc(n) + '"></option>' : "";
     }).join("");
+  }
+
+  /* v4.1 polish：输入的活动名不在列表里 → 提示「提交时会新建这个活动」 */
+  function knownActivity(name) {
+    return state.activities.some(function (a) { return str(a.fields, F.activity.name) === name; });
+  }
+  function updateActivityHint() {
+    var hint = el("#activity-hint");
+    var input = el("#upload-form") && el("#upload-form").querySelector ? el("#upload-form").querySelector('input[name="activity"]') : null;
+    if (!hint || !input) return;
+    var v = String(input.value || "").trim();
+    if (!v) { hint.textContent = "从列表里选已有活动；输入新名称会自动新建一条活动记录。"; hint.classList.remove("is-new"); return; }
+    var isNew = !knownActivity(v);
+    hint.textContent = isNew ? "将新建活动「" + v + "」，照片数从这次上传开始计。" : "已有活动：照片数会自动 +1。";
+    hint.classList.toggle("is-new", isNew);
   }
 
   /* v3：上传弹窗可以直接带着模式打开（成员工作区的快捷入口） */
@@ -603,6 +632,7 @@
   function openUpload(mode) {
     populateActivityDatalist();
     applyMode(mode || "link");
+    updateActivityHint();
     var status = el("#upload-status");
     if (status) status.textContent = "";
     openModal(el("#upload-modal"));
@@ -650,6 +680,9 @@
       openUpload();
     });
 
+    var actInput = form.querySelector('input[name="activity"]');
+    if (actInput && actInput.addEventListener) actInput.addEventListener("input", updateActivityHint);
+
     form.querySelectorAll('input[name="mode"]').forEach(function (r) {
       r.addEventListener("change", function () {
         applyMode((new FormData(form).get("mode")) || "link");
@@ -696,11 +729,14 @@
         });
       }
 
-      p.then(function () {
+      p.then(function (res) {
         status.textContent = "已入库 ✓";
         form.reset();
         applyMode("link");
-        toast(DEMO ? "演示模式：已模拟入库" : "素材已入库，稍后刷新可见");
+        updateActivityHint();
+        toast(DEMO ? "演示模式：已模拟入库"
+          : res && res.activityCreated ? "素材已入库，并新建了活动「" + activity + "」"
+          : "素材已入库，稍后刷新可见");
         setTimeout(function () { closeModal(modal); }, 700);
         reloadData();
       }).catch(function (err) {
@@ -723,9 +759,7 @@
       var date = (data.get("date") || "").toString().trim();
       var record = (data.get("record") || "").toString().trim();
       var contact = (data.get("contact") || "").toString().trim();
-      if (contact) record += "\n联系人：" + contact;
       var c = data.get("creativity") || 0, a = data.get("activity") || 0, s = data.get("service") || 0;
-      var desc = record + ((c || a || s) ? "\nCAS：C " + c + " / A " + a + " / S " + s : "");
 
       if (!CONNECTED) {
         // 静态回退：本地模拟提交
@@ -735,15 +769,15 @@
       }
 
       status.textContent = "提交中…";
+      // v4.1 polish：联系人和 CAS 分字段发，由服务端统一写进申请（申请不会出现在公开时间线上）
       api("/api/request", {
         method: "POST",
-        body: { name: name, date: date, desc: desc, status: "待选片", unit: "照片组", type: "其他" },
+        body: { name: name, date: date, desc: record, contact: contact, casC: c, casA: a, casS: s },
       }).then(function () {
         status.textContent = DEMO
           ? "演示模式：已模拟提交，不会真正保存。"
-          : "已收到「" + name + "」的拍摄申请，我们会尽快联系你。";
+          : "已收到「" + name + "」的拍摄邀请。OAO 会在排期后用你留的联系方式联系你。";
         form.reset();
-        reloadData();
       }).catch(function (err) {
         status.textContent = "提交失败：" + err.message;
       });
@@ -927,7 +961,7 @@
         (skills.length ? '<p class="roster-skills">' +
           skills.map(function (t) { return "<span>" + esc(t) + "</span>"; }).join("") + "</p>" : "") +
         "</article>";
-    }).join("") || emptyState("还没有人登记资料。");
+    }).join("") || emptyState("还没有人登记资料。填好上面的成员资料表就能加入名册。");
   }
 
   function loadMembers() {
@@ -1025,6 +1059,7 @@
       var n = parseInt((countInput && countInput.value) || "0", 10);
       if (!n || n < 2 || n > 20) { status.textContent = "组数请填 2–20 之间的整数。"; return; }
       if (!DEMO && !state.token) { status.textContent = "请先登录再分组。"; return; }
+      if (!DEMO && state.role !== "admin") { status.textContent = "AI 分组只对管理员开放。"; return; }
 
       status.textContent = "分组中…";
       btn.disabled = true;
@@ -1061,6 +1096,8 @@
     demo: DEMO,
     connected: CONNECTED,
     members: function () { return state.members; },
+    /* v4.1 polish：events.js 加载日历后把「待开拍任务数」交给首屏统计 */
+    setUpcoming: function (n) { state.upcoming = n; renderHeroStats(); },
     /* 需要成员身份：已登录直接执行；否则弹登录框，登录成功后接着执行 */
     requireMember: function (fn) {
       if (state.token || DEMO) { fn(); return; }

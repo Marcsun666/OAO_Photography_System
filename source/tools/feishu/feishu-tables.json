@@ -49,7 +49,8 @@
             "待剪辑",
             "调色中",
             "待发布",
-            "已发布"
+            "已发布",
+            "待处理申请"
           ]
         },
         {
@@ -95,6 +96,15 @@
           "name": "提取码",
           "type": "text",
           "primary": false
+        },
+        {
+          "name": "来源",
+          "type": "single_select",
+          "primary": false,
+          "options": [
+            "成员录入",
+            "邀请拍摄"
+          ]
         }
       ]
     },

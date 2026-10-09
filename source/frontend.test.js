@@ -84,9 +84,18 @@ function runWithConfig(cfg, fetchImpl) {
   let r = runWithConfig({ proxyUrl: "https://mock.local" }, mockFetch);
   await new Promise((res) => setTimeout(res, 30));
 
-  const stat = r.bySel.get("#stat-rail").innerHTML;
-  assert.ok(stat.includes(">2<"), "hero 应显示 2 场活动，实际: " + stat);
-  assert.ok(stat.includes(">86<"), "hero 应显示 86 张照片，实际: " + stat);
+  // v4.1 polish：首屏统计 = 待开拍任务（日历加载后由 events.js 告知）/ 照片素材 / 作品链接；0 不显示成「0」
+  let stat = r.bySel.get("#stat-rail").innerHTML;
+  assert.ok(stat.includes(">…<") && stat.includes("个拍摄任务待开拍"), "任务数加载前显示「…」，实际: " + stat);
+  assert.ok(stat.includes(">86<") && stat.includes("份照片素材"), "照片素材取 照片数 合计与素材条数的较大值，实际: " + stat);
+  assert.ok(stat.includes(">1<") && stat.includes("条作品链接"), "作品链接数，实际: " + stat);
+  assert.ok(!/<strong>0<\/strong>/.test(stat), "统计里不应出现 0");
+  global.window.OAO.setUpcoming(5);
+  stat = r.bySel.get("#stat-rail").innerHTML;
+  assert.ok(stat.includes(">5<") && stat.includes("个拍摄任务待开拍"), "日历加载后显示待开拍任务数");
+  global.window.OAO.setUpcoming(0);
+  stat = r.bySel.get("#stat-rail").innerHTML;
+  assert.ok(stat.includes("近期暂无拍摄任务") && stat.includes(">—<") && !/<strong>0<\/strong>/.test(stat), "0 个任务显示「—」+ 友好说明");
   const tl = r.bySel.get("#timeline-list").innerHTML;
   // 用 /<article/ 而不是 /<article>/：卡片带了 class，裸标签匹配会漏
   assert.strictEqual((tl.match(/<article/g) || []).length, 2, "时间线应有 2 条");
@@ -121,7 +130,8 @@ function runWithConfig(cfg, fetchImpl) {
   r = runWithConfig({ demo: true, proxyUrl: "" }, demoNoFetch);
   await new Promise((res) => setTimeout(res, 220)); // demoApi 有 100ms 延迟
   assert.strictEqual(demoFetchCalled, false, "演示模式不应走 fetch");
-  assert.ok(r.bySel.get("#stat-rail").innerHTML.includes(">6<"), "演示模式应渲染 6 场活动");
+  assert.ok(r.bySel.get("#stat-rail").innerHTML.includes(">870<"), "演示模式：6 个示例活动的照片数合计 870");
+  assert.ok(r.bySel.get("#stat-rail").innerHTML.includes(">2<"), "演示模式：2 条作品链接");
   assert.ok(r.bySel.get("#gallery-grid").innerHTML.includes("empty-state"), "演示模式照片墙应为空态（照片示例已删除）");
   assert.strictEqual(r.bySel.get("#member-toggle").textContent, "成员登录", "演示模式应进入成员界面（登录按钮可见）");
   const demoTl = r.bySel.get("#timeline-list").innerHTML;

@@ -93,6 +93,14 @@ assert.deepStrictEqual(fFront, fBack, "前后端字段名常量不一致");
   assert.ok(ev.includes("f.casC.value") && ev.includes("casC: f.casC.value"), "编辑器读写 casC");
   assert.ok(/\.ag-cas\s*\{/.test(read("styles.css")) && /\.cas-grid\.cas-grid-2\s*\{/.test(read("styles.css")), "CAS 样式存在");
 }
+/* 2c+) v4.1 polish：邀请拍摄用「来源」字段 + 「待处理申请」状态区分；上传窗 / 分组的提示元素存在 */
+{
+  const schema = read("tools/feishu/schema.py"), cf = read("cloud-function/index.js");
+  assert.ok(schema.includes('SEL("来源", ["成员录入", "邀请拍摄"])') && schema.includes('"待处理申请"'), "schema.py 有 来源 / 待处理申请");
+  assert.ok(cf.includes('source: "来源"') && cf.includes('"待处理申请"') && cf.includes('"邀请拍摄"'), "后端用同样的名字");
+  assert.ok(read("SETUP.md").includes("待处理申请") && read("SETUP.md").includes("| 来源 |"), "SETUP.md 写了新字段");
+  for (const id of ["activity-hint", "group-admin-hint"]) assert.ok(html.includes('id="' + id + '"'), "缺少 #" + id);
+}
 /* 2d) v4.1 申请拍摄区：仍保留（表单字段不变），文案写明给其他社团 / 老师，社员去拍摄日历报名 */
 {
   const sec = html.slice(html.indexOf('id="request"'), html.indexOf("</section>", html.indexOf('id="request"')));

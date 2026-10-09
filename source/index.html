@@ -198,7 +198,7 @@
         </div>
 
         <div class="gallery-grid" id="gallery-grid">
-          <div class="empty-state">照片合集为空，上传照片后自动展示。</div>
+          <div class="empty-state">还没有可展示的照片。成员登录后可以直接上传。</div>
         </div>
       </section>
 
@@ -237,21 +237,22 @@
             <input name="contact" type="text" placeholder="例如：王同学 · 微信 / 班级" autocomplete="name" required />
           </label>
           <fieldset class="cas-field">
-            <legend>CAS 时长（小时，可留空）</legend>
+            <legend>参与拍摄的 OAO 社员可记的 CAS 时长（小时，可留空）</legend>
             <div class="cas-grid" aria-label="CAS 时间记录">
               <label>
                 <span>C</span>
-                <input name="creativity" type="number" min="0" step="0.5" placeholder="0" inputmode="decimal" />
+                <input name="creativity" type="number" min="0" max="5" step="0.5" placeholder="0" inputmode="decimal" />
               </label>
               <label>
                 <span>A</span>
-                <input name="activity" type="number" min="0" step="0.5" placeholder="0" inputmode="decimal" />
+                <input name="activity" type="number" min="0" max="5" step="0.5" placeholder="0" inputmode="decimal" />
               </label>
               <label>
                 <span>S</span>
-                <input name="service" type="number" min="0" step="0.5" placeholder="0" inputmode="decimal" />
+                <input name="service" type="number" min="0" max="5" step="0.5" placeholder="0" inputmode="decimal" />
               </label>
             </div>
+            <p class="cas-hint">C、S 会带进 OAO 的拍摄任务（0.5–5 小时，0.5 一档；不填按 1 小时）；A 仅供我们参考。</p>
           </fieldset>
           <label>
             <span>活动描述或活动记录</span>
@@ -295,7 +296,7 @@
 
       <section class="events" id="events" aria-labelledby="events-title">
         <div class="section-copy">
-          <p class="eyebrow">Calendar Feel</p>
+          <p class="eyebrow">Club Life</p>
           <h2 id="events-title">你会参与的现场</h2>
         </div>
         <div class="event-track" aria-label="活动列表">
@@ -357,7 +358,7 @@
           <div>
             <p class="eyebrow">Members</p>
             <h2 id="member-area-title">成员工作区</h2>
-            <p class="section-lede member-lede-out">上传素材、贴链接、看名册和 AI 分组都在这里。输入成员口令后解锁。</p>
+            <p class="section-lede member-lede-out">上传素材、贴链接、登记名册都在这里；拍摄任务的报名和交付在拍摄日历。输入成员口令后解锁。</p>
             <p class="section-lede member-lede-in">已登录。常用操作都在下面，一步直达。</p>
           </div>
         </div>
@@ -384,7 +385,7 @@
             <span class="action-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2"/><path d="M3.5 18.5a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.5 14.2a4.3 4.3 0 0 1 5 4.3"/></svg>
             </span>
-            <strong>名册 · AI 分组</strong><span>登记技能，一键分组</span>
+            <strong>名册 · AI 分组</strong><span>登记技能 · 管理员分组</span>
           </a>
         </div>
         <div class="member-locked" id="member-locked">
@@ -498,7 +499,7 @@
           </div>
         </div>
         <div class="archive-grid" id="archive-grid">
-          <div class="empty-state">素材库为空，接入素材后自动展示。</div>
+          <div class="empty-state">素材库还是空的。成员登录后可以贴网盘链接或上传照片。</div>
         </div>
       </section>
 
@@ -571,6 +572,7 @@
             <div class="group-tool" id="group-tool">
               <p class="panel-label">AI 自动分组</p>
               <p class="group-lede">按技能互补自动分组，结果可以人工改。</p>
+              <p class="group-admin-hint" id="group-admin-hint">AI 分组会用到全社共用的 AI 额度，只对管理员开放。成员先登记好资料，分组交给社长或组长。</p>
               <div class="group-controls">
                 <label>
                   <span>分几组</span>
@@ -599,7 +601,7 @@
           <a href="#works">作品</a>
           <a href="#rednote">小红书</a>
           <a href="#request">邀请拍摄</a>
-          <a href="#join">加入我们</a>
+          <a href="#join">加入</a>
           <a href="#member-area">成员区</a>
         </nav>
         <div class="footer-social">
@@ -615,7 +617,7 @@
         <button class="modal-close" type="button" aria-label="关闭">×</button>
         <p class="eyebrow">Member Access</p>
         <h3>社团成员登录</h3>
-        <p class="modal-note">输入社团访问口令，解锁上传、贴网盘链接和活动记录管理。</p>
+        <p class="modal-note">输入社团成员口令，解锁拍摄任务报名与交付、上传照片、贴网盘 / 作品链接和成员名册。</p>
         <form id="login-form">
           <label>
             <span>访问口令</span>
@@ -635,9 +637,10 @@
         <h3>上传 · 贴链接</h3>
         <form id="upload-form">
           <label class="field-activity">
-            <span>所属活动（选择或新建）</span>
-            <input name="activity" list="activity-list" placeholder="例如：排球社合照" required />
+            <span>所属活动（选择已有，或输入新名称自动新建）</span>
+            <input name="activity" list="activity-list" placeholder="例如：排球社合照" required autocomplete="off" />
             <datalist id="activity-list"></datalist>
+            <small class="field-hint" id="activity-hint" aria-live="polite">从列表里选已有活动；输入新名称会自动新建一条活动记录。</small>
           </label>
           <fieldset class="mode-tabs">
             <legend>入库方式</legend>
@@ -756,9 +759,13 @@
           </div>
           <div class="ed-row">
             <label><span>日期</span><input name="date" type="date" required /></label>
-            <label><span>时间</span><input name="time" type="text" list="ed-times" placeholder="11:50-12:20 / 放学" /></label>
+            <label><span>时间（必选）</span><input name="time" type="text" list="ed-times" placeholder="点下面的快捷选项，或自己填" required /></label>
           </div>
           <datalist id="ed-times"><option value="11:50-12:20"></option><option value="放学"></option></datalist>
+          <div class="time-chips" role="group" aria-label="常用时间">
+            <button class="chip" type="button" data-time-pick="11:50-12:20" aria-pressed="false">11:50-12:20 午休</button>
+            <button class="chip" type="button" data-time-pick="放学" aria-pressed="false">放学 15:30-17:30</button>
+          </div>
           <div class="ed-row">
             <label><span>地点（可选）</span><input name="place" type="text" maxlength="40" /></label>
             <label><span>需要人数（可选）</span><input name="need" type="number" min="0" max="50" step="1" /></label>
@@ -802,7 +809,7 @@
       </a>
       <a href="#member-area" data-tab="member-area">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg>
-        <span>成员</span>
+        <span>成员区</span>
       </a>
     </nav>
 

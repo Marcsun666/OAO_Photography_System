@@ -94,6 +94,7 @@ const F = {
     cover: "封面",
     link: "网盘链接",
     code: "提取码",
+    source: "来源", // v4.1 polish：邀请拍摄 / 成员录入。「邀请拍摄」的行是外部申请，不上公开时间线
   },
   photo: {
     activity: "活动",
@@ -450,7 +451,8 @@ async function route(req) {
 
   // 只读接口
   if (path === "/api/activities" && method === "GET") {
-    const items = await listRecords(ENV.tableActivities);
+    // v4.1 polish：「邀请拍摄」提交的申请（含联系人）不进公开时间线 / 统计 / 工作台，只在管理后台出现
+    const items = (await listAll(ENV.tableActivities)).filter((a) => !isShootRequest(a));
     return respond(200, { ok: true, items });
   }
   if (path === "/api/photos" && method === "GET") {
@@ -483,19 +485,26 @@ async function route(req) {
     });
   }
 
-  // 公开的“申请拍摄”表单：无需登录，写入活动记录表，状态默认待选片。
-  // 定位是“给其他社团/活动负责人提交拍摄申请”，成员再在飞书里整理。
+  // 公开的「邀请拍摄」表单（给其他社团 / 老师）：无需登录，写入活动记录表。
+  // v4.1 polish：一律标成 来源=邀请拍摄、状态=待处理申请（不信任前端传来的状态），
+  // 因此不会出现在公开时间线 / 统计 / 工作台，只在管理后台「拍摄申请」里出现。
   if (path === "/api/request" && method === "POST") {
-    const d = JSON.parse(body || "{}");
-    const fields = {};
-    if (d.name) fields[F.activity.name] = d.name;
-    if (d.date) fields[F.activity.date] = d.date;
-    if (d.desc) fields[F.activity.desc] = d.desc;
-    fields[F.activity.status] = d.status || "待选片";
-    fields[F.activity.unit] = d.unit || "照片组";
-    fields[F.activity.type] = d.type || "其他";
+    const d = parseBody(body);
+    const name = clip(d.name, 60);
+    if (!name) return respond(400, { ok: false, msg: "请填写活动名称" });
+    const fields = {
+      [F.activity.name]: name,
+      [F.activity.status]: REQUEST_STATUS,
+      [F.activity.source]: REQUEST_SOURCE,
+      [F.activity.unit]: "照片组",
+      [F.activity.type]: "其他",
+    };
+    const date = clip(d.date, 40);
+    if (date) fields[F.activity.date] = date;
+    const desc = buildRequestDesc(d);
+    if (desc) fields[F.activity.desc] = desc;
     const record = await createRecord(ENV.tableActivities, fields);
-    return respond(200, { ok: true, record: recordToItem(record) });
+    return respond(200, { ok: true, id: record && record.record_id });
   }
 
   // v4：日历 / 报名 / 交付 / 管理后台 / AI（见 routeV4）
@@ -550,15 +559,16 @@ async function route(req) {
     if (d.fileToken) fields[F.photo.file] = [{ file_token: d.fileToken }];
     const record = await createRecord(ENV.tablePhotos, fields);
 
-    // 同步：该活动照片数 +1（尽力而为，找不到同名活动也不报错）
+    // 同步：该活动照片数 +1；v4.1 polish：名称是新的就顺手新建这条活动（尽力而为，失败不阻断主流程）
+    let activity = null;
     if (d.activity && !d.photoAlreadyCounted) {
       try {
-        await incrementActivityPhotoCount(d.activity);
+        activity = await ensureActivityAndCount(d.activity);
       } catch (e) {
         /* 忽略同步失败，不阻断主流程 */
       }
     }
-    return respond(200, { ok: true, record: recordToItem(record) });
+    return respond(200, { ok: true, record: recordToItem(record), activityCreated: !!(activity && activity.created) });
   }
 
   // 上传文件并入库（前端读 base64 → 这里传飞书 → 建照片记录）
@@ -575,14 +585,15 @@ async function route(req) {
     fields[F.photo.file] = [{ file_token: fileToken }];
     const record = await createRecord(ENV.tablePhotos, fields);
 
+    let activity = null;
     if (d.activity) {
       try {
-        await incrementActivityPhotoCount(d.activity);
+        activity = await ensureActivityAndCount(d.activity);
       } catch (e) {
         /* 忽略同步失败 */
       }
     }
-    return respond(200, { ok: true, record: recordToItem(record), fileToken });
+    return respond(200, { ok: true, record: recordToItem(record), fileToken, activityCreated: !!(activity && activity.created) });
   }
 
   // 新增外链
@@ -626,6 +637,8 @@ async function route(req) {
    * 要留档的话，在这里加一次 createRecord 写进「分组」表即可，其余逻辑不用动。
    */
   if (path === "/api/group" && method === "POST") {
+    // v4.1 polish：AI 分组花的是全社共用的 AI 额度，只给管理员用（服务端强制）
+    if (!isAdmin(req)) return respond(403, { ok: false, code: "ADMIN_ONLY", msg: "AI 分组只对管理员开放，请联系社长或组长" });
     const d = JSON.parse(body || "{}");
     const groupCount = Math.floor(Number(d.groupCount));
     if (!groupCount || groupCount < 2 || groupCount > 20) {
@@ -865,12 +878,30 @@ async function saveGroups(groups) {
   return { saved: true, batch };
 }
 
-async function incrementActivityPhotoCount(activityName) {
-  const matches = await searchActivitiesByName(activityName);
-  if (!matches.length) return;
-  const rec = matches[0];
-  const cur = Number((rec.fields && rec.fields[F.activity.photoCount]) || 0);
-  await updateRecord(ENV.tableActivities, rec.id, { [F.activity.photoCount]: cur + 1 });
+/* 照片数 +1。v4.1 polish：上传弹窗里输入的是新活动名 → 新建一条活动记录（照片数 = 1），
+ * 这样「所属活动（选择或新建）」名副其实，照片数也和照片素材对得上。
+ * 同名的「邀请拍摄」申请不算活动（那是外部申请，不能被成员上传改动）。 */
+async function ensureActivityAndCount(activityName) {
+  const name = clip(activityName, 60);
+  if (!name) return null;
+  const matches = (await searchActivitiesByName(name)).filter((a) => !isShootRequest(a));
+  if (matches.length) {
+    const rec = matches[0];
+    const cur = Number((rec.fields && rec.fields[F.activity.photoCount]) || 0) || 0;
+    await updateRecord(ENV.tableActivities, rec.id, { [F.activity.photoCount]: cur + 1 });
+    return { id: rec.id, created: false };
+  }
+  const p = cnParts();
+  const rec = await createRecord(ENV.tableActivities, {
+    [F.activity.name]: name,
+    [F.activity.date]: `${p.y}.${pad2(p.m)}`,
+    [F.activity.unit]: "照片组",
+    [F.activity.status]: "待选片",
+    [F.activity.type]: "其他",
+    [F.activity.photoCount]: 1,
+    [F.activity.source]: MEMBER_SOURCE,
+  });
+  return { id: rec && rec.record_id, created: true };
 }
 
 /* ================================================================== *
@@ -979,6 +1010,10 @@ function eventWindow(date, time) {
   return { start: at(0, 0), end: at(23, 59) };
 }
 
+function isEnded(status, end, now) {
+  if (status === "已结束") return true;
+  return !!end && (now == null ? Date.now() : now) >= end;
+}
 function eventView(rec) {
   const f = rec.fields || {};
   const date = normDate(f[F.event.date]);
@@ -997,7 +1032,9 @@ function eventView(rec) {
     casC: casRead(f, F.event.casC),
     casS: casRead(f, F.event.casS),
     start: w.start, end: w.end,
-    ended: !!w.end && Date.now() >= w.end,
+    // v4.1 polish：时间过了，或管理员手动标了「已结束」，都算结束（交付开放）。
+    // 单个时间「15:30」按 1 小时算；「放学」= 15:30–17:30；没写时间 = 当天 23:59 结束。
+    ended: isEnded(fstr(f, F.event.status), w.end),
   };
 }
 function appView(rec) {
@@ -1064,13 +1101,47 @@ function eventFieldsFrom(d, partial) {
   return { fields, errs };
 }
 
-/* 「申请拍摄」表单写进活动记录表时会带「联系人：」或「CAS：」，据此认出申请 */
+/* v4.1 polish：「邀请拍摄」申请的标记。新申请写 来源=邀请拍摄、状态=待处理申请；
+ * 旧数据（v4.1 之前）没有来源字段，靠描述里的「联系人：」/「CAS：」行认出来（tools/feishu/migrate_requests.py 会补标）。 */
+const REQUEST_SOURCE = "邀请拍摄";
+const MEMBER_SOURCE = "成员录入";
+const REQUEST_STATUS = "待处理申请";
 function isShootRequest(a) {
-  const desc = fstr(a.fields, F.activity.desc);
-  return /联系人：|CAS：/.test(desc);
+  const f = (a && a.fields) || {};
+  if (fstr(f, F.activity.source) === REQUEST_SOURCE) return true;
+  if (fstr(f, F.activity.source)) return false; // 明确标了别的来源（成员录入）
+  if (fstr(f, F.activity.status) === REQUEST_STATUS) return true;
+  return /(^|\n)\s*(联系人：|CAS：)/.test(fstr(f, F.activity.desc));
 }
+/* 公开备注里不能有联系方式和 CAS 行（CAS 会转成任务的 CAS-C / CAS-S） */
 function stripContact(text) {
-  return String(text || "").split("\n").filter((l) => !/^联系人：/.test(l.trim())).join("\n");
+  return String(text || "").split("\n")
+    .filter((l) => !/^(联系人|联系方式|联系|CAS)[：:]/.test(l.trim()))
+    .join("\n").trim();
+}
+/* 申请里的「CAS：C 2 / A 1 / S 0.5」→ { c, a, s }（数字或 null） */
+function parseRequestCas(text) {
+  const line = String(text || "").split("\n").map((l) => l.trim()).find((l) => /^CAS[：:]/.test(l)) || "";
+  const pick = (k) => { const m = line.match(new RegExp(k + "\\s*([0-9]+(?:\\.[0-9]+)?)")); return m ? Number(m[1]) : null; };
+  return { c: pick("C"), a: pick("A"), s: pick("S") };
+}
+/* 申请里的 C / S → 任务的 CAS：夹到 0.5–5，取最近的 0.5 档；没填或 0 → 默认 1 */
+function casFromRequest(v) {
+  const n = Number(v);
+  if (v == null || !isFinite(n) || n <= 0) return CAS_DEFAULT;
+  return Math.min(CAS_MAX, Math.max(CAS_MIN, Math.round(n * 2) / 2));
+}
+/* 公开申请表 → 描述。结构化字段优先（contact / casC / casA / casS），兼容旧前端直接传 desc */
+function buildRequestDesc(d) {
+  const num = (v) => { const n = Number(v); return v === "" || v == null || !isFinite(n) || n < 0 ? 0 : Math.min(n, 99); };
+  const lines = [];
+  const base = clip(d.desc, 1000);
+  if (base) lines.push(base);
+  const contact = clip(d.contact, 80);
+  if (contact && !/联系人：/.test(base)) lines.push("联系人：" + contact);
+  const c = num(d.casC), a = num(d.casA), s = num(d.casS);
+  if ((c || a || s) && !/CAS：/.test(base)) lines.push(`CAS：C ${c} / A ${a} / S ${s}`);
+  return lines.join("\n");
 }
 
 function needTables() {
@@ -1286,14 +1357,18 @@ async function routeAdmin(req) {
     const dup = evs.find((e) => e.source === m[1]);
     if (dup && !d.force) return respond(409, { ok: false, msg: `这条申请已经转成任务「${dup.title}」`, item: dup });
     const f = reqRec.fields || {};
+    const rc = parseRequestCas(fstr(f, F.activity.desc));
     const input = {
       title: d.title || fstr(f, F.activity.name),
       category: d.category || "其他",
       date: d.date || normDate(fstr(f, F.activity.date)),
       time: d.time != null ? d.time : ((fstr(f, F.activity.date).match(/\d{1,2}[:：]\d{2}/) || [""])[0]),
       place: d.place, need: d.need, status: d.status || "开放报名",
-      casC: d.casC, casS: d.casS,
-      note: d.note != null ? d.note : stripContact(fstr(f, F.activity.desc)).slice(0, 500),
+      // v4.1 polish：没在编辑器里给值时，用申请里的 C / S（夹到 0.5–5、0.5 一档；没填 = 1）
+      casC: d.casC != null && d.casC !== "" ? d.casC : casFromRequest(rc.c),
+      casS: d.casS != null && d.casS !== "" ? d.casS : casFromRequest(rc.s),
+      // 备注成员都看得到：去掉联系人 / CAS 行（编辑器传来的备注也再过滤一次）
+      note: stripContact(d.note != null ? d.note : fstr(f, F.activity.desc)).slice(0, 500),
     };
     const { fields, errs } = eventFieldsFrom(input, false);
     if (errs.length) return respond(400, { ok: false, msg: errs.join("；") });
@@ -1344,17 +1419,22 @@ async function adminOverview() {
     return e && e.status !== "已取消" && ["已报名", "已确认", "已退回"].indexOf(a.status) >= 0 && e.end && now - e.end > 24 * 3600 * 1000;
   }).map((a) => ({ ...a, event: byEvent[a.eventId] }));
 
-  const requests = acts.filter(isShootRequest).map((a) => ({
-    id: a.id, name: fstr(a.fields, F.activity.name), date: fstr(a.fields, F.activity.date),
-    desc: fstr(a.fields, F.activity.desc), status: fstr(a.fields, F.activity.status),
-    convertedTo: (events.find((e) => e.source === a.id) || {}).id || "",
-  }));
+  const requests = acts.filter(isShootRequest).map((a) => {
+    const desc = fstr(a.fields, F.activity.desc), rc = parseRequestCas(desc);
+    return {
+      id: a.id, name: fstr(a.fields, F.activity.name), date: fstr(a.fields, F.activity.date),
+      desc, status: fstr(a.fields, F.activity.status),
+      note: stripContact(desc), cas: { c: rc.c, a: rc.a, s: rc.s, taskC: casFromRequest(rc.c), taskS: casFromRequest(rc.s) },
+      convertedTo: (events.find((e) => e.source === a.id) || {}).id || "",
+    };
+  });
+  const realActs = acts.filter((a) => !isShootRequest(a));
 
   return respond(200, {
     ok: true,
     now, today,
     stats: {
-      activities: acts.length, photos: photos.length, links: links.length, members: members.length,
+      activities: realActs.length, photos: photos.length, links: links.length, members: members.length,
       requests: requests.length, events: events.length, applications: apps.filter((a) => a.status !== "已取消").length,
     },
     pipeline,
@@ -1579,7 +1659,7 @@ async function aiDraft(d) {
     "把下面这条社团拍摄申请整理成一个拍摄任务草稿。今天是 " + cnToday() + "（北京时间）。",
     `活动名称：${fstr(f, F.activity.name)}`,
     `活动时间：${fstr(f, F.activity.date)}`,
-    `描述：${stripContact(fstr(f, F.activity.desc)).slice(0, 500)}`,
+    `描述：${stripContact(fstr(f, F.activity.desc)).slice(0, 500)}`, // 不发联系人 / CAS 行
     `类别只能从这些里选：${EVENT_CATEGORIES.join("、")}。`,
     '只输出 JSON：{"title":"≤20字","category":"…","date":"YYYY-MM-DD，不确定就空","time":"HH:MM-HH:MM 或 放学 或空","place":"","need":2,"note":"≤60字拍摄重点"}',
   ].join("\n");
@@ -1593,7 +1673,9 @@ async function aiDraft(d) {
       time: clip(j.time, 20), place: clip(j.place, 40),
       need: Math.max(0, Math.min(20, Math.floor(Number(j.need)) || 2)),
       note: clip(j.note, 200),
-      casC: CAS_DEFAULT, casS: CAS_DEFAULT, // CAS 时间不交给 AI 猜，管理员在编辑器里改
+      // CAS 时间不交给 AI 猜：用申请里填的 C / S（夹到 0.5–5），没填就是 1
+      casC: casFromRequest(parseRequestCas(fstr(f, F.activity.desc)).c),
+      casS: casFromRequest(parseRequestCas(fstr(f, F.activity.desc)).s),
     };
     return respond(200, { ok: true, requestId: rec.id, draft, ...aiMeta(r) });
   } catch (e) { return aiFail(e); }
@@ -1641,7 +1723,8 @@ async function aiWeekly() {
 exports._parseGroupJson = parseGroupJson;
 exports._saveGroups = saveGroups;
 exports._checkGroups = checkGroups;
-exports._v4 = { costOf, worstCost, eventWindow, normDate, validBaiduLink, stopAt, AI_FEATURES, PRICE };
+exports._v4 = { costOf, worstCost, eventWindow, normDate, validBaiduLink, stopAt, AI_FEATURES, PRICE,
+  isEnded, isShootRequest, stripContact, parseRequestCas, casFromRequest, buildRequestDesc };
 
 /**
  * 平台无关入口（Cloudflare Pages Functions 用）。

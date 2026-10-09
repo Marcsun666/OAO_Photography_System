@@ -16,6 +16,8 @@ process.env.TABLE_MEMBERS = "tbl_member";
 process.env.TABLE_GROUPS = "tbl_group";
 process.env.MEMBER_PASSCODE = "oao2026";
 process.env.MEMBER_TOKEN = "session-token-123";
+process.env.ADMIN_PASSCODE = "admin-pass";
+process.env.ADMIN_TOKEN = "admin-token-456";
 
 const calls = [];
 function jsonRes(obj) {
@@ -167,19 +169,25 @@ function ev(method, path, body, headers) {
   r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 2 })), {});
   assert.strictEqual(r.statusCode, 401, "未登录分组应被拒绝");
 
+  // v4.1 polish：AI 分组只给管理员 —— 成员 token → 403，且不调用模型
+  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 2 }), auth), {});
+  assert.strictEqual(r.statusCode, 403, "成员不能跑 AI 分组");
+  assert.strictEqual(JSON.parse(r.body).code, "ADMIN_ONLY");
+  const adminAuth = { authorization: "Bearer admin-token-456" };
+
   // groupCount 非法 → 400
-  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 1 }), auth), {});
+  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 1 }), adminAuth), {});
   assert.strictEqual(r.statusCode, 400, "groupCount=1 应被拒绝");
-  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 99 }), auth), {});
+  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 99 }), adminAuth), {});
   assert.strictEqual(r.statusCode, 400, "groupCount=99 应被拒绝");
 
   // 人数不够分 → 400（mock 里只有 4 个成员）
-  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 12 }), auth), {});
+  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 12 }), adminAuth), {});
   assert.strictEqual(r.statusCode, 400, "人数不够应返回 400");
   assert.ok(JSON.parse(r.body).msg.includes("不够"), "应说明人数不够");
 
   // 参数合法但模型没接 → 501，且带机器可读的 code
-  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 2 }), auth), {});
+  r = await main_handler(ev("POST", "/api/group", JSON.stringify({ groupCount: 2 }), adminAuth), {});
   assert.strictEqual(r.statusCode, 501, "模型未配置应返回 501");
   const g = JSON.parse(r.body);
   assert.ok(g.code === "LLM_NOT_CONFIGURED" || g.code === "LLM_NOT_IMPLEMENTED",
