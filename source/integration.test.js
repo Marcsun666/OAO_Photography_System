@@ -74,6 +74,34 @@ assert.deepStrictEqual(fFront, fBack, "前后端字段名常量不一致");
   }
 }
 
+/* 2c) v4.1 CAS 时间：字段名在后端 / schema.py 一致，编辑器有 C/S 输入框（0.5–5，0.5 一档），详情/议程会显示 */
+{
+  const code = read("cloud-function/index.js");
+  assert.ok(/casC:\s*"CAS-C"/.test(code) && /casS:\s*"CAS-S"/.test(code), "后端 F.event.casC/casS = CAS-C/CAS-S");
+  const schema = read("tools/feishu/schema.py");
+  assert.ok(/CAS = lambda n: \{"field_name": n, "type": 2, "property": \{"formatter": "0.0"\}\}/.test(schema), "CAS 字段是数字、格式 0.0");
+  assert.ok(schema.includes('CAS("CAS-C"), CAS("CAS-S")'), "schema.py 拍摄任务里有 CAS-C / CAS-S");
+  const form = html.slice(html.indexOf('id="edit-form"'), html.indexOf("</form>", html.indexOf('id="edit-form"')));
+  for (const n of ["casC", "casS"]) {
+    const m = form.match(new RegExp('<input name="' + n + '"[^>]*>'));
+    assert.ok(m, "任务编辑器缺少 " + n + " 输入框");
+    assert.ok(/type="number"/.test(m[0]) && /min="0.5"/.test(m[0]) && /max="5"/.test(m[0]) && /step="0.5"/.test(m[0]), n + " 应为 0.5–5、步长 0.5");
+  }
+  assert.ok(form.includes('class="cas-field"') && form.includes("cas-grid"), "编辑器沿用申请表的 CAS 样式");
+  const ev = read("events.js");
+  assert.ok(ev.includes('["CAS 时间", casText(e)]'), "任务详情显示 CAS 时间");
+  assert.ok(ev.includes("f.casC.value") && ev.includes("casC: f.casC.value"), "编辑器读写 casC");
+  assert.ok(/\.ag-cas\s*\{/.test(read("styles.css")) && /\.cas-grid\.cas-grid-2\s*\{/.test(read("styles.css")), "CAS 样式存在");
+}
+/* 2d) v4.1 申请拍摄区：仍保留（表单字段不变），文案写明给其他社团 / 老师，社员去拍摄日历报名 */
+{
+  const sec = html.slice(html.indexOf('id="request"'), html.indexOf("</section>", html.indexOf('id="request"')));
+  for (const n of ["event", "date", "contact", "creativity", "activity", "service", "record"]) assert.ok(sec.includes('name="' + n + '"'), "申请表字段 " + n + " 不能删");
+  assert.ok(/其他社团/.test(sec) && /老师/.test(sec), "申请区写明给其他社团和老师");
+  assert.ok(/<a href="#calendar">拍摄日历<\/a>/.test(sec), "给社员的提示链接到 #calendar");
+  assert.ok(!/>申请拍摄</.test(html), "导航 / 标签栏不再用容易误会的「申请拍摄」");
+}
+
 /* 3) 文档字段名 */
 const setup = read("SETUP.md");
 for (const name of ["活动名称", "照片数", "视频数", "网盘链接", "提取码", "分类", "平台",

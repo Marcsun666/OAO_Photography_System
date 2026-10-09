@@ -140,6 +140,8 @@ Object.assign(F, {
     note: "备注",
     seedKey: "种子键",
     source: "来源申请",
+    casC: "CAS-C", // v4.1：CAS 时间（小时），0.5 一档
+    casS: "CAS-S",
   },
   // v4：报名与交付（一人报一个任务 = 一行）
   app: {
@@ -904,6 +906,21 @@ function fnum(fields, key) {
   const n = Number(fields ? fields[key] : NaN);
   return isFinite(n) ? n : 0;
 }
+/* v4.1 CAS 时间：0.5–5，0.5 一档；新任务默认 C 1 / S 1。
+ * 飞书列表接口把数字返回成字符串（"1.5"），手动在飞书里改的值也照样显示；空格子按默认 1 显示。 */
+const CAS_DEFAULT = 1, CAS_MIN = 0.5, CAS_MAX = 5;
+function casRead(fields, key) {
+  const v = fields ? fields[key] : null;
+  if (v == null || (typeof v === "string" && !v.trim()) || (Array.isArray(v) && !v.length)) return CAS_DEFAULT;
+  const n = Number(Array.isArray(v) ? fstr(fields, key) : typeof v === "object" ? (v.text || v.value) : v);
+  return isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : CAS_DEFAULT;
+}
+function casValid(v) {
+  if (typeof v === "boolean" || v == null || (typeof v === "string" && !v.trim())) return null;
+  const n = Number(v);
+  if (!isFinite(n) || n < CAS_MIN || n > CAS_MAX || Math.abs(n * 2 - Math.round(n * 2)) > 1e-9) return null;
+  return Math.round(n * 2) / 2;
+}
 
 async function listAll(table) {
   let out = [], pageToken = "";
@@ -977,6 +994,8 @@ function eventView(rec) {
     status: fstr(f, F.event.status) || "开放报名",
     note: fstr(f, F.event.note),
     source: fstr(f, F.event.source),
+    casC: casRead(f, F.event.casC),
+    casS: casRead(f, F.event.casS),
     start: w.start, end: w.end,
     ended: !!w.end && Date.now() >= w.end,
   };
@@ -1035,6 +1054,13 @@ function eventFieldsFrom(d, partial) {
     if (EVENT_STATUS.indexOf(st) < 0) errs.push("状态只能是：" + EVENT_STATUS.join(" / ")); else fields[F.event.status] = st;
   }
   if (d.note != null) fields[F.event.note] = clip(d.note, 500);
+  // v4.1 CAS 时间：新建（含申请转任务）不填就是 1；编辑时只改传了的
+  [["casC", F.event.casC, "C"], ["casS", F.event.casS, "S"]].forEach(([k, col, label]) => {
+    const given = d[k] != null && d[k] !== "";
+    if (!given) { if (!partial) fields[col] = CAS_DEFAULT; return; }
+    const n = casValid(d[k]);
+    if (n == null) errs.push(`CAS ${label} 应为 ${CAS_MIN}–${CAS_MAX} 小时，0.5 一档`); else fields[col] = n;
+  });
   return { fields, errs };
 }
 
@@ -1212,7 +1238,9 @@ async function routeAdmin(req) {
       const apps = (await listAll(ENV.tableApplications)).map(appView).filter((a) => a.eventId === m[1]);
       for (const a of apps) await updateRecord(ENV.tableApplications, a.id, { [F.app.eventTitle]: fields[F.event.title] });
     }
-    return respond(200, { ok: true, item: eventView(recordToItem(rec)) });
+    // 飞书 update 接口只回传改动的字段；和原记录合并，返回完整任务（v4.1：CAS 往返才看得准）
+    const upd = recordToItem(rec);
+    return respond(200, { ok: true, item: eventView({ ...upd, id: upd.id || m[1], fields: { ...(cur.fields || {}), ...(upd.fields || {}) } }) });
   }
   // 管理员直接指派（= 替成员报名并确认）
   if (path === "/api/admin/applications" && method === "POST") {
@@ -1264,6 +1292,7 @@ async function routeAdmin(req) {
       date: d.date || normDate(fstr(f, F.activity.date)),
       time: d.time != null ? d.time : ((fstr(f, F.activity.date).match(/\d{1,2}[:：]\d{2}/) || [""])[0]),
       place: d.place, need: d.need, status: d.status || "开放报名",
+      casC: d.casC, casS: d.casS,
       note: d.note != null ? d.note : stripContact(fstr(f, F.activity.desc)).slice(0, 500),
     };
     const { fields, errs } = eventFieldsFrom(input, false);
@@ -1564,6 +1593,7 @@ async function aiDraft(d) {
       time: clip(j.time, 20), place: clip(j.place, 40),
       need: Math.max(0, Math.min(20, Math.floor(Number(j.need)) || 2)),
       note: clip(j.note, 200),
+      casC: CAS_DEFAULT, casS: CAS_DEFAULT, // CAS 时间不交给 AI 猜，管理员在编辑器里改
     };
     return respond(200, { ok: true, requestId: rec.id, draft, ...aiMeta(r) });
   } catch (e) { return aiFail(e); }

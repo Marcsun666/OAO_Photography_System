@@ -156,6 +156,64 @@ const call = (method, path, body, token, query) => api.handle({
   assert.strictEqual((await call("POST", "/api/admin/requests/" + reqId + "/convert", {}, "admin-token")).status, 409, "不重复转换");
   assert.strictEqual(db.tbl_act.find((x) => x.record_id === reqId).fields.状态, undefined, "不改申请本身");
 
+  /* 7b) v4.1 CAS 时间（字段 CAS-C / CAS-S）：日历和后台都带；飞书返回字符串也认；新建默认 1/1；0.5–5、0.5 一档 */
+  {
+    const evCas = add("tbl_ev", { 名称: "飞书里直接改过", 类别: "篮球", 日期: day(4), 时间: "放学", 状态: "开放报名", "CAS-C": "1.5", "CAS-S": "2" });
+    r = await call("GET", "/api/events");
+    const byId = {}; r.body.items.forEach((e) => (byId[e.id] = e));
+    assert.strictEqual(byId[evCas.record_id].casC, 1.5, "飞书字符串 \"1.5\" → 1.5");
+    assert.strictEqual(byId[evCas.record_id].casS, 2);
+    assert.strictEqual(byId[evFuture.record_id].casC, 1, "空格子按默认 1");
+    assert.strictEqual(byId[evFuture.record_id].casS, 1);
+    r = await call("GET", "/api/admin/overview", null, "admin-token");
+    const ov = r.body.events.find((e) => e.id === evCas.record_id);
+    assert.strictEqual(ov.casC, 1.5); assert.strictEqual(ov.casS, 2, "后台数据也带 CAS");
+    // 新建：不填 → 写入 1 / 1（数字）
+    r = await call("POST", "/api/admin/events", { title: "CAS 默认", category: "其他", date: "2026-10-31" }, "admin-token");
+    assert.strictEqual(r.status, 200);
+    const created = db.tbl_ev.find((x) => x.record_id === r.body.item.id);
+    assert.strictEqual(created.fields["CAS-C"], 1); assert.strictEqual(created.fields["CAS-S"], 1);
+    assert.strictEqual(r.body.item.casC, 1); assert.strictEqual(r.body.item.casS, 1);
+    // 新建：给值（字符串也行）
+    r = await call("POST", "/api/admin/events", { title: "CAS 给值", category: "其他", date: "2026-10-31", casC: "2.5", casS: 0.5 }, "admin-token");
+    assert.strictEqual(r.status, 200); assert.strictEqual(r.body.item.casC, 2.5); assert.strictEqual(r.body.item.casS, 0.5);
+    // 校验：范围 / 步长 / 非数字
+    for (const bad of [0, 0.25, 1.2, 5.5, -1, "abc", true, 6]) {
+      const x = await call("POST", "/api/admin/events", { title: "坏 CAS", category: "其他", date: "2026-10-31", casC: bad }, "admin-token");
+      assert.strictEqual(x.status, 400, "CAS C=" + JSON.stringify(bad) + " 应 400"); assert.ok(x.body.msg.includes("CAS C"));
+    }
+    assert.strictEqual((await call("PUT", "/api/admin/events/" + evCas.record_id, { casS: 7 }, "admin-token")).status, 400);
+    assert.strictEqual(db.tbl_ev.filter((x) => x.fields.名称 === "坏 CAS").length, 0, "校验失败不落库");
+    // 编辑：只改传了的那个；不传 CAS 时不覆盖飞书里的值
+    r = await call("PUT", "/api/admin/events/" + evCas.record_id, { casS: 3.5 }, "admin-token");
+    assert.strictEqual(r.status, 200); assert.strictEqual(r.body.item.casC, 1.5); assert.strictEqual(r.body.item.casS, 3.5);
+    r = await call("PUT", "/api/admin/events/" + evCas.record_id, { status: "已安排" }, "admin-token");
+    assert.strictEqual(evCas.fields["CAS-C"], "1.5", "改状态不动 CAS"); assert.strictEqual(r.body.item.casS, 3.5);
+    r = await call("PUT", "/api/admin/events/" + evCas.record_id, { casC: 5, casS: "1" }, "admin-token");
+    assert.strictEqual(r.body.item.casC, 5); assert.strictEqual(r.body.item.casS, 1);
+    // 飞书 update 只回传改动的字段时，响应仍是完整任务
+    const realFetch = global.fetch;
+    global.fetch = async (u, o = {}) => {
+      const res = await realFetch(u, o);
+      if ((o.method || "GET") !== "PUT") return res;
+      const j = await res.json();
+      return { ok: true, status: 200, json: async () => ({ code: 0, data: { record: { record_id: j.data.record.record_id, fields: JSON.parse(o.body).fields } } }) };
+    };
+    r = await call("PUT", "/api/admin/events/" + evCas.record_id, { casC: 4.5 }, "admin-token");
+    global.fetch = realFetch;
+    assert.strictEqual(r.body.item.casC, 4.5); assert.strictEqual(r.body.item.casS, 1); assert.strictEqual(r.body.item.title, "飞书里直接改过", "部分回传也返回完整任务");
+    // 申请转任务：默认 1 / 1；也可以在编辑器里给值
+    const req2 = add("tbl_act", { 活动名称: "合唱团音乐会", 日期: "2026.12.01 18:00", 描述: "合唱\n联系人：李老师" });
+    r = await call("POST", "/api/admin/requests/" + req2.record_id + "/convert", { casC: 2 }, "admin-token");
+    assert.strictEqual(r.status, 200); assert.strictEqual(r.body.item.casC, 2); assert.strictEqual(r.body.item.casS, 1);
+    const req3 = add("tbl_act", { 活动名称: "美术展开幕", 日期: "2026.12.02", 描述: "展览\n联系人：张同学" });
+    r = await call("POST", "/api/admin/requests/" + req3.record_id + "/convert", {}, "admin-token");
+    assert.strictEqual(r.body.item.casC, 1); assert.strictEqual(r.body.item.casS, 1, "转任务默认 1/1");
+    assert.strictEqual((await call("POST", "/api/admin/requests/" + req3.record_id + "/convert", { force: true, casC: 9 }, "admin-token")).status, 400);
+    // 成员不能改 CAS
+    assert.strictEqual((await call("PUT", "/api/admin/events/" + evCas.record_id, { casC: 2 }, "member-token")).status, 403);
+  }
+
   /* 8) AI：成员可润色；记账；预算/次数守卫 */
   r = await call("POST", "/api/ai/caption", { desc: "冲刺瞬间，阳光很好" });
   assert.strictEqual(r.status, 401);
@@ -198,6 +256,7 @@ const call = (method, path, body, token, query) => api.handle({
   llmReply = '{"title":"音乐剧公演跟拍","category":"冰球","date":"2026-11-20","time":"18:30-20:30","need":3,"note":"舞台"}';
   r = await call("POST", "/api/admin/ai/draft", { requestId: reqId }, "admin-token");
   assert.strictEqual(r.status, 200); assert.strictEqual(r.body.draft.category, "其他"); assert.strictEqual(r.body.draft.need, 3);
+  assert.strictEqual(r.body.draft.casC, 1); assert.strictEqual(r.body.draft.casS, 1, "AI 草稿的 CAS 默认 1/1");
 
   /* 9) 纯函数 */
   assert.ok(_v4.validBaiduLink("https://pan.baidu.com/s/1AbC-dEf_12"));

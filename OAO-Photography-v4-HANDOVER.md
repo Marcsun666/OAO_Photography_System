@@ -1,5 +1,6 @@
 # OAO Photography Club (OAO 摄影社) website: v4 handover
 
+> **v4.1 (preview only, 2026-10-09):** CAS 时间 on tasks + clearer 邀请拍摄 copy, on git branch `v4.1` and Pages branch `v41` (<https://v41.oao-photography.pages.dev>). Production is still v4. See **§18**.
 > **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09): LIVE in production** at <https://oao-photography.pages.dev> (Cloudflare deployment `522b752c`, git `main` / tag `v4`). The v4 preview remains at <https://v4.oao-photography.pages.dev> (Pages branch `v4`). **Rollback:** v3 deployment `0d0d5be2` (git tag `v3`); see §17.8. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
 > **Live URL (v4 since 2026-10-09):** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
 > **Source:** the private GitHub repo `Marcsun666/OAO_Photography_System`: `main` and tag `v4` = this version (live); tag `v3` = previous production (rollback); tag/branch `v2` = older (see §11).
@@ -770,7 +771,7 @@ v2 and v3 use the same API, secrets and Feishu data, so rolling back in either d
 
 | Table | Env var | id | Fields (exact names) |
 |---|---|---|---|
-| 拍摄任务 | `TABLE_EVENTS` | `tbliKFLeS4KfLGKO` | 名称, 类别 (篮球/足球/匹克球/乒乓球/长绳/文化周/其他), 日期 (YYYY-MM-DD text), 时间 (`11:50-12:20` / `放学` / free text), 地点, 需要人数, 状态 (开放报名/已安排/已结束/已取消), 备注, 种子键, 来源申请 |
+| 拍摄任务 | `TABLE_EVENTS` | `tbliKFLeS4KfLGKO` | 名称, 类别 (篮球/足球/匹克球/乒乓球/长绳/文化周/其他), 日期 (YYYY-MM-DD text), 时间 (`11:50-12:20` / `放学` / free text), 地点, 需要人数, 状态 (开放报名/已安排/已结束/已取消), 备注, 种子键, 来源申请, **CAS-C**, **CAS-S** (v4.1, number, format `0.0`; see §18) |
 | 报名与交付 | `TABLE_APPLICATIONS` | `tblzwdHHFJNRm1eA` | 成员姓名, 学号, 任务ID, 任务名称, 状态 (已报名/已确认/已交付/已验收/已退回/已取消), 百度网盘链接, 提取码, 描述, AI文案, 报名时间, 提交时间, 管理备注 |
 | AI用量 | `TABLE_AI_USAGE` | `tblhaJ6i2hU8bWo1` | 键 (`YYYY-MM|feature`), 月份, 功能, 调用次数, 输入tokens, 输出tokens, 费用元, 当日, 当日次数 |
 
@@ -854,3 +855,67 @@ Then run the §14 checks plus: admin passcode → 管理 appears; `/api/admin/ov
 - Delivery stores Baidu links only (no file upload), as requested.
 - `deepseek-chat` is an alias DeepSeek may retire; if calls start failing, set `LLM_MODEL` to the current model and re-check pricing in the comment above `PRICE`.
 - The calendar opens on the current month; 2026 autumn schedule is Oct–Nov.
+
+---
+
+## 18. v4.1 (PREVIEW ONLY, 2026-10-09): CAS 时间 on tasks + 邀请拍摄 copy
+
+**Status:** deployed to the Pages branch `v41` → <https://v41.oao-photography.pages.dev> (same site password). **Not** in production; production is still v4 (`522b752c`). Git: branch `v4.1` (not merged into `main`). Promote only after the owner approves (§18.5).
+
+### 18.1 Backup taken before v4.1 (keep it)
+
+- Git: tag **`v4.0-backup`** and branch **`v4.0`**, both = `main` at `c6b186e` (live v4).
+- `/workspace/backups/v4.0-2026-10-09/` (chmod 700, on the build machine only, **never commit**):
+  `deploy/` (the exact v4 production build), `source-tree/` (git archive of `main`), `feishu/<table>.json` (all 8 tables: field schemas + every record, paginated; **contains student personal data**), `ROLLBACK.md`.
+- Rollback target for production: deployment **`522b752c-166e-4583-a01b-c6d5455c3f8e`** (dashboard → Deployments → Rollback), or redeploy `backups/v4.0-2026-10-09/deploy` with `--branch main`.
+
+### 18.2 CAS 时间 (what was built)
+
+- **Feishu:** 拍摄任务 has two number fields **`CAS-C`** and **`CAS-S`** (format `0.0`), added with `tools/feishu/setup_tables.py` from `schema.py` (`CAS(...)` helper; `verify.py` now also checks number formats). All 29 existing tasks were set to C=1, S=1 with `tools/feishu/set_cas_default.py --all` (batch_update). `set_cas_default.py` without `--all` only fills empty cells.
+- **Backend** (`cloud-function/index.js`, `F.event.casC/casS`):
+  - `GET /api/events` items and `GET /api/admin/overview` events carry `casC` / `casS` as numbers. The Feishu list API returns them as strings (`"1.5"`); `casRead()` converts. An **empty cell shows as 1**. Values edited directly in Feishu show up on the next load (no cache).
+  - Admin `POST /api/admin/events`, `PUT /api/admin/events/:id` and `POST /api/admin/requests/:id/convert` accept `casC` / `casS` (number or numeric string). Validation: 0.5–5 in 0.5 steps, otherwise HTTP 400 `CAS C 应为 0.5–5 小时，0.5 一档`. New tasks and converted requests default to 1 / 1. PUT only changes what is sent. The ✦ AI 整理 draft returns 1 / 1 (AI never guesses CAS).
+  - Fix: the `PUT /api/admin/events/:id` response used to contain only the changed fields (Feishu's update API returns a partial record). It is now merged with the current record.
+- **Frontend** (`events.js`, `index.html`, `styles.css`):
+  - Task detail: a `CAS 时间` tile showing `C 1 · S 1` (`C 1.5` for halves; no A).
+  - Mobile agenda and the day list: a third line `CAS 时间 C 1 · S 1` (`.ag-cas`, label tinted with the category colour; light and dark).
+  - Desktop month chips: CAS is in the chip tooltip and the screen-reader label only. A visible `C1 S1` tag was tried and dropped because at 1280px it truncated 5 of 24 October titles (the calendar is capped at 1180px wide, so bigger screens don't help).
+  - Admin 任务编辑器: `C` / `S` number inputs (min 0.5, max 5, step 0.5, default 1), using the same `.cas-field` / `.cas-grid` style as the request form (`.cas-grid-2` = 2 columns, plus a modal-specific fix so the letter prefix and full width match).
+- **Tests:** `v4.test.js` (strings from Feishu, defaults, validation, partial PUT, convert defaults, partial-response merge, member 403), `events.test.js` (format, agenda line, tooltip), `integration.test.js` (field names in backend + schema.py, editor inputs, request section). All 6 test files pass.
+
+### 18.3 申请拍摄 → 邀请拍摄 (copy only)
+
+The `#request` section and its form/backend are unchanged. Only the wording changed, so members don't mistake it for task sign-up:
+
+| Where | v4 | v4.1 |
+|---|---|---|
+| eyebrow | Request | For Clubs & Teachers |
+| heading | 申请 OAO 拍摄活动 | 邀请 OAO 来拍你的活动 |
+| lede | 给其他社团或活动负责人：填好活动信息和联系方式，提交后直接进入 OAO 的拍摄排期，我们会尽快联系你。 | 给其他社团、活动组织者和老师：想请 OAO 到场拍摄？填好活动信息和联系方式，提交后进入 OAO 的拍摄排期，我们会尽快联系你。 |
+| new hint | – | OAO 社员不用填这张表：想参与拍摄，请到 [拍摄日历](#calendar) 报名任务。 |
+| nav, footer, mobile tab bar | 申请拍摄 | 邀请拍摄 |
+| hero button | 申请拍摄 | 邀请 OAO 拍摄 |
+| timeline empty state | …点「申请拍摄」告诉我们。 | 想请 OAO 来拍？点「邀请拍摄」告诉我们。 |
+
+The admin dashboard still calls these records 拍摄申请.
+
+### 18.4 Preview secrets and checks
+
+- The preview environment has every v4 secret, including `TABLE_EVENTS`. **Changed on 2026-10-09:** the preview `ADMIN_PASSCODE` was stale (it did not match the admin passcode used in production), so it was set to the production value from `/home/box/.oao/admin-passcode.txt` (piped, never echoed). The preview `ADMIN_TOKEN` and `MEMBER_TOKEN` still differ from production.
+- Live checks on v41 (2026-10-09): site lock 401 → login 303 → health `connected`; `/cloud-function/index.js` 404; `/api/events` = 29 tasks, all C=1 S=1, no 学号; member and admin passcodes → roles member/admin; wrong code 401; `/api/admin/overview` 401 without a token and 403 with the member token; admin PUT `casC 2.5 / casS "0.5"` round-trips through `/api/events` and the overview; invalid values (7, 1.2) → 400; a direct Feishu edit (3.5 / 4) showed on the site on the next load; everything restored to 1 / 1 (Feishu re-checked: 29 × `"1"`/`"1"`).
+- Screenshots (Chrome via Playwright, logged in through `/__login`, 1280 and 390, light and dark, no page errors): `/workspace/v41-shots/`.
+- The preview reads and writes the **same Feishu Base** as production. The CAS fields and the 1/1 values are therefore already in the live Base. v4 production ignores them.
+
+### 18.5 Promote v4.1 (only after owner approval)
+
+```bash
+export WRANGLER_CACHE_DIR=/tmp/wcache   # CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID in env
+cd /workspace/oao-deploy-v41            # or: bash source/tools/build-deploy.sh <dir> from branch v4.1
+rm -rf .wrangler && npx wrangler@4 pages deploy . --project-name oao-photography --branch main --commit-dirty=true
+# git: merge v4.1 into main, rebuild deploy/, tag v4.1, push
+```
+
+No production secret changes are needed. Rollback: §18.1.
+
+Note: GitHub reports the repo `Marcsun666/OAO_Photography_System` as **public** (older sections of this doc say private). It contains no secrets, but it does document the Base app_token and table ids. Never commit `/workspace/backups/`.
+

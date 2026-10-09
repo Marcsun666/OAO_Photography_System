@@ -31,6 +31,9 @@ for name, spec in SPEC.items():
             problems.append(f"{name}: missing field {f['field_name']}")
         elif g["type"] != f["type"]:
             problems.append(f"{name}.{f['field_name']}: type {g['type']} != expected {f['type']}")
+        elif f["type"] == 2 and (f.get("property") or {}).get("formatter") and \
+                ((g.get("property") or {}).get("formatter") != f["property"]["formatter"]):
+            problems.append(f"{name}.{f['field_name']}: number format {(g.get('property') or {}).get('formatter')} != expected {f['property']['formatter']}")
         elif f["type"] == 3:
             have = {o["name"] for o in g["property"]["options"]}
             miss = [o["name"] for o in f["property"]["options"] if o["name"] not in have]

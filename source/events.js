@@ -69,6 +69,16 @@
   function evClass(e) {
     return "c-" + catKey(e.category) + (e.status === "已取消" ? " is-cancel" : "") + (e.ended ? " is-ended" : "");
   }
+  /* v4.1 CAS 时间：「C 1 · S 1.5」（没有 A）。缺值按 1 显示；飞书可能给字符串 "1.5"。
+   * 桌面月历格子里不放可见标签（1280px 下会把 5/24 个任务名截断），只放在悬停提示和读屏文字里；
+   * 任务详情和手机议程里完整显示。 */
+  function casNum(v) {
+    var n = Number(v);
+    if (v == null || v === "" || !isFinite(n) || n < 0) n = 1;
+    n = Math.round(n * 100) / 100;
+    return String(n);
+  }
+  function casText(e) { return "C " + casNum(e && e.casC) + " · S " + casNum(e && e.casS); }
   function countText(e, counts) {
     var c = (counts && counts[e.id]) || { applied: 0 };
     return "报名 " + c.applied + (e.need ? " / 需 " + e.need + " 人" : "");
@@ -81,8 +91,8 @@
       var cls = "cal-cell" + (c.inMonth ? "" : " is-out") + (c.day === today ? " is-today" : "") +
         (c.dow > 4 ? " is-weekend" : "") + (ex ? " is-exam" : "") + (list.length ? " has-ev" : "");
       var evs = list.slice(0, MAX).map(function (e) {
-        return '<button class="cal-ev ' + evClass(e) + '" type="button" data-ev="' + esc(e.id) + '" title="' + esc(e.title + " · " + (e.time || "")) +
-          '" aria-label="' + esc(e.title + "，" + cnDate(e.date) + " " + (e.time || "") + "，" + e.status) + '"><i aria-hidden="true"></i><span>' + esc(shortTitle(e)) + "</span></button>";
+        return '<button class="cal-ev ' + evClass(e) + '" type="button" data-ev="' + esc(e.id) + '" title="' + esc(e.title + " · " + (e.time || "") + " · CAS 时间 " + casText(e)) +
+          '" aria-label="' + esc(e.title + "，" + cnDate(e.date) + " " + (e.time || "") + "，" + e.status + "，CAS 时间 " + casText(e)) + '"><i aria-hidden="true"></i><span>' + esc(shortTitle(e)) + "</span></button>";
       }).join("");
       var more = list.length > MAX ? '<button class="cal-more" type="button" data-day="' + c.day + '">还有 ' + (list.length - MAX) + " 项</button>" : "";
       return '<div class="' + cls + '" role="gridcell" data-date="' + c.day + '">' +
@@ -111,13 +121,15 @@
       out += '<div class="ag-day' + (day === today ? " is-today" : "") + '"><div class="ag-date"><strong>' + d + "</strong><span>周" + WEEK[dow] + "</span></div><div class=\"ag-list\">" +
         list.map(function (e) {
           return '<button class="ag-ev ' + evClass(e) + '" type="button" data-ev="' + esc(e.id) + '"><i aria-hidden="true"></i><span class="ag-t">' + esc(e.title) +
-            '</span><span class="ag-m">' + esc(e.time || "全天") + " · " + esc(e.status === "开放报名" && !e.ended ? countText(e, counts) : e.ended && e.status !== "已取消" ? "已结束" : e.status) + "</span></button>";
+            '</span><span class="ag-m">' + esc(e.time || "全天") + " · " + esc(e.status === "开放报名" && !e.ended ? countText(e, counts) : e.ended && e.status !== "已取消" ? "已结束" : e.status) + "</span>" +
+            casLine(e) + "</button>";
         }).join("") + "</div></div>";
     }
     if (weekOpen) out += "</div>";
     return any ? out : '<div class="empty-state">这个月还没有拍摄任务。</div>';
   }
-  var pure = { monthCells: monthCells, renderMonthHTML: renderMonthHTML, renderAgendaHTML: renderAgendaHTML, catKey: catKey, shortTitle: shortTitle, EXAMS: EXAMS, CATS: CATS };
+  function casLine(e) { return '<span class="ag-cas"><b>CAS 时间</b>' + esc(casText(e)) + "</span>"; }
+  var pure = { monthCells: monthCells, renderMonthHTML: renderMonthHTML, renderAgendaHTML: renderAgendaHTML, catKey: catKey, shortTitle: shortTitle, casText: casText, EXAMS: EXAMS, CATS: CATS };
   if (typeof module !== "undefined" && module.exports) { module.exports = pure; return; }
   window.OAOCal = pure;
 
@@ -227,7 +239,7 @@
       (ex ? '<p class="modal-note">' + esc(ex.label) + "</p>" : "") +
       '<div class="day-list">' + list.map(function (e) {
         return '<button class="ag-ev ' + evClass(e) + '" type="button" data-ev="' + esc(e.id) + '"><i aria-hidden="true"></i><span class="ag-t">' + esc(e.title) +
-          '</span><span class="ag-m">' + esc(e.time || "全天") + " · " + esc(phase(e)) + "</span></button>";
+          '</span><span class="ag-m">' + esc(e.time || "全天") + " · " + esc(phase(e)) + "</span>" + casLine(e) + "</button>";
       }).join("") + "</div>";
     O.openModal($("#event-modal"));
   }
@@ -235,7 +247,7 @@
     var c = S.counts[e.id] || { applied: 0, confirmed: 0 };
     var mine = myAppFor(e.id);
     var rows = [
-      ["日期", cnDate(e.date, true)], ["时间", e.time || "全天"], e.place ? ["地点", e.place] : null,
+      ["日期", cnDate(e.date, true)], ["时间", e.time || "全天"], ["CAS 时间", casText(e)], e.place ? ["地点", e.place] : null,
       ["报名", c.applied + " 人" + (e.need ? "（需要 " + e.need + " 人）" : "") + (c.confirmed ? " · 已确认 " + c.confirmed : "")],
     ].filter(Boolean);
     var action = "";
@@ -566,6 +578,7 @@
     f.title.value = data.title || ""; f.category.value = data.category || "其他"; f.status.value = data.status || "开放报名";
     f.date.value = data.date || S.today || ""; f.time.value = data.time != null ? data.time : "11:50-12:20";
     f.place.value = data.place || ""; f.need.value = data.need || ""; f.note.value = data.note || "";
+    f.casC.value = casNum(data.casC); f.casS.value = casNum(data.casS);
     S.editing = { mode: mode, id: data.id || data.requestId || "" };
     $("#ed-title").textContent = mode === "edit" ? "编辑任务" : mode === "convert" ? "申请 → 任务" : "新建任务";
     $("#ed-note").textContent = note || "";
@@ -575,8 +588,11 @@
   function submitEditor(f) {
     var st = $("#ed-status"), ed = S.editing;
     var body = { title: f.title.value.trim(), category: f.category.value, status: f.status.value, date: f.date.value,
-      time: f.time.value.trim(), place: f.place.value.trim(), need: f.need.value === "" ? "" : Number(f.need.value), note: f.note.value.trim() };
+      time: f.time.value.trim(), place: f.place.value.trim(), need: f.need.value === "" ? "" : Number(f.need.value), note: f.note.value.trim(),
+      casC: f.casC.value === "" ? 1 : Number(f.casC.value), casS: f.casS.value === "" ? 1 : Number(f.casS.value) };
     if (!body.title || !body.date) { st.textContent = "名称和日期必填"; return; }
+    var casBad = [["C", body.casC], ["S", body.casS]].filter(function (x) { return !(x[1] >= 0.5 && x[1] <= 5 && x[1] * 2 === Math.round(x[1] * 2)); });
+    if (casBad.length) { st.textContent = "CAS " + casBad[0][0] + " 应为 0.5–5 小时，0.5 一档"; return; }
     var p = ed.mode === "edit" ? O.api("/api/admin/events/" + ed.id, { method: "PUT", auth: true, body: body })
       : ed.mode === "convert" ? O.api("/api/admin/requests/" + ed.id + "/convert", { method: "POST", auth: true, body: body })
       : O.api("/api/admin/events", { method: "POST", auth: true, body: body });

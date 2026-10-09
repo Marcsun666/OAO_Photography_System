@@ -32,7 +32,7 @@
         <a href="#calendar">日历</a>
         <a href="#works">作品</a>
         <a href="#rednote">小红书</a>
-        <a href="#request">申请拍摄</a>
+        <a href="#request">邀请拍摄</a>
         <a href="#join">加入</a>
         <a href="#member-area">成员区</a>
         <a href="#admin" class="nav-admin">管理</a>
@@ -98,7 +98,7 @@
           <p class="hero-eyebrow">OAO 摄影社 · 照片组 / 视频组</p>
           <h1 id="hero-title">给同学们记录社团活动、整理照片视频、沉淀每一次校园现场。</h1>
           <div class="hero-actions">
-            <a class="button primary" href="#request">申请拍摄</a>
+            <a class="button primary" href="#request">邀请 OAO 拍摄</a>
             <a class="button glass" href="#works">看照片合集</a>
           </div>
         </div>
@@ -218,9 +218,10 @@
 
       <section class="request-section strip" id="request" aria-labelledby="request-title">
         <div class="request-copy">
-          <p class="eyebrow">Request</p>
-          <h2 id="request-title">申请 OAO 拍摄活动</h2>
-          <p>给其他社团或活动负责人：填好活动信息和联系方式，提交后直接进入 OAO 的拍摄排期，我们会尽快联系你。</p>
+          <p class="eyebrow">For Clubs &amp; Teachers</p>
+          <h2 id="request-title">邀请 OAO 来拍你的活动</h2>
+          <p>给其他社团、活动组织者和老师：想请 OAO 到场拍摄？填好活动信息和联系方式，提交后进入 OAO 的拍摄排期，我们会尽快联系你。</p>
+          <p class="request-member-hint">OAO 社员不用填这张表：想参与拍摄，请到 <a href="#calendar">拍摄日历</a> 报名任务。</p>
         </div>
         <form class="request-form" id="request-form">
           <label>
@@ -597,7 +598,7 @@
           <a href="#calendar">日历</a>
           <a href="#works">作品</a>
           <a href="#rednote">小红书</a>
-          <a href="#request">申请拍摄</a>
+          <a href="#request">邀请拍摄</a>
           <a href="#join">加入我们</a>
           <a href="#member-area">成员区</a>
         </nav>
@@ -762,6 +763,19 @@
             <label><span>地点（可选）</span><input name="place" type="text" maxlength="40" /></label>
             <label><span>需要人数（可选）</span><input name="need" type="number" min="0" max="50" step="1" /></label>
           </div>
+          <fieldset class="cas-field">
+            <legend>CAS 时间（小时，0.5–5，默认 1）</legend>
+            <div class="cas-grid cas-grid-2" aria-label="任务的 CAS 时间">
+              <label>
+                <span>C</span>
+                <input name="casC" type="number" min="0.5" max="5" step="0.5" value="1" placeholder="1" inputmode="decimal" aria-label="CAS C（Creativity）小时" />
+              </label>
+              <label>
+                <span>S</span>
+                <input name="casS" type="number" min="0.5" max="5" step="0.5" value="1" placeholder="1" inputmode="decimal" aria-label="CAS S（Service）小时" />
+              </label>
+            </div>
+          </fieldset>
           <label><span>备注</span><textarea name="note" rows="2" maxlength="500"></textarea></label>
           <button class="button primary" type="submit">保存</button>
           <p class="modal-status" id="ed-status" aria-live="polite"></p>
@@ -780,7 +794,7 @@
       </a>
       <a href="#request" data-tab="request" class="tab-primary">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        <span>申请拍摄</span>
+        <span>邀请拍摄</span>
       </a>
       <a href="#rednote" data-tab="rednote">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8 9h8M8 12.5h8M8 16h5"/></svg>

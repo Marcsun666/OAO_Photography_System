@@ -317,6 +317,16 @@
           "name": "来源申请",
           "type": "text",
           "primary": false
+        },
+        {
+          "name": "CAS-C",
+          "type": "number",
+          "primary": false
+        },
+        {
+          "name": "CAS-S",
+          "type": "number",
+          "primary": false
         }
       ]
     },

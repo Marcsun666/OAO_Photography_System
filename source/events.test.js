@@ -53,4 +53,19 @@ const bad = cal.renderMonthHTML(2026, 10, [{ id: "r", title: "<img src=x onerror
 assert.ok(!bad.includes("<img src=x"), "标题要转义");
 assert.strictEqual(cal.catKey("不存在"), "ot");
 
-console.log("✅ v4 日历渲染测试通过（29 个任务、期中考试标注、议程、转义）");
+// v4.1 CAS 时间：「C 1 · S 1」，0.5 显示成 1.5，飞书字符串也认，缺值按 1，没有 A
+assert.strictEqual(cal.casText({ casC: 1, casS: 1 }), "C 1 · S 1");
+assert.strictEqual(cal.casText({ casC: "1.5", casS: 2 }), "C 1.5 · S 2");
+assert.strictEqual(cal.casText({ casC: 0.5, casS: "5.0" }), "C 0.5 · S 5");
+assert.strictEqual(cal.casText({}), "C 1 · S 1");
+assert.ok(!/A/.test(cal.casText({ casC: 2, casS: 3 })));
+const casSeed = seed.map((e, i) => Object.assign({}, e, i === 0 ? { casC: "1.5", casS: "2" } : { casC: 1, casS: 1 }));
+const agCas = cal.renderAgendaHTML(2026, 10, casSeed, "2026-10-09", {});
+assert.strictEqual((agCas.match(/class="ag-cas"/g) || []).length, 27, "手机议程每个任务都有 CAS 时间行");
+assert.ok(agCas.includes("<b>CAS 时间</b>C 1.5 · S 2"), "议程显示飞书里改过的值");
+const octCas = cal.renderMonthHTML(2026, 10, casSeed, "2026-10-09", {});
+assert.strictEqual((octCas.match(/CAS 时间 C /g) || []).length, 48, "桌面格子：每个任务的悬停提示 + 读屏文字都带 CAS 时间");
+assert.ok(octCas.includes("CAS 时间 C 1.5 · S 2"), "格子提示显示飞书里改过的值");
+assert.strictEqual((octCas.match(/class="cal-ev /g) || []).length, 24, "加 CAS 不改变格子数量");
+
+console.log("✅ v4 日历渲染测试通过（29 个任务、期中考试标注、议程、转义、v4.1 CAS 时间）");
