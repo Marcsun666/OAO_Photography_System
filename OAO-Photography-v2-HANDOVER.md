@@ -589,6 +589,58 @@ Flow:
 - **Join form copy is honest.** The join form is still UI-only (nothing is saved), and the copy now says so.
 - **Better empty states** that point to the next action.
 
+### 16.2b v3 r2 refinement (2026-10-09, after the owner's first review)
+
+The owner's feedback: "epic transitions, smooth transitions, smoother corners, the page you first see when you log in, should be better designed, instead of a bottom fade picture, no significant color breaks should be seen, follow apple aesthetics."
+
+**1. Transitions**
+
+- **Reveal on scroll.** Each section's content fades up as you scroll to it, using Apple's long easing `cubic-bezier(0.22,1,0.36,1)` over 0.9 to 1.1 s. Headings go from blurred to sharp, and items in grids appear one after another.
+  - Driven by `IntersectionObserver` in `script.js` (`setupMotion`), plus a debounced sweep when scrolling stops so nothing stays hidden after a fast jump.
+  - It no longer uses CSS `animation-timeline`, which Chrome supports but Safari/iOS does not.
+  - Only `opacity`, `translate` and `transform` are animated.
+- **Hero scroll effect.** A scroll handler throttled with `requestAnimationFrame` writes `--hp` (0→1) to the hero. As you scroll:
+  - the photo card grows from 0.94 to 1,
+  - the photo inside drifts upward slightly,
+  - the headline fades and rises.
+- **Login to site.** On submit, the login card recedes (it shrinks and blurs) before the form actually posts. The site's first screen then fades in on the same background: eyebrow, headline, buttons, photo card, stats card.
+- **Pop-ups.** They now animate both opening and closing. They stay rendered and switch between hidden and visible instead of `display:none`. On mobile they slide up as bottom sheets.
+- **Buttons** spring back with a slight overshoot when released.
+- **Navigation glass** changes over 600 ms as you scroll.
+- **Progressive enhancement.**
+  - An inline `<head>` script adds `html.motion` only when reduced motion is not requested.
+  - Elements are hidden only after JS has added `.rv` to them, so the content still shows if JS fails.
+
+**2. Corners**
+
+- One set of radii: cards 28px, media and modals 32px, mobile sheets 32px at the top, pill-shaped buttons.
+- Images are clipped to the card's corners.
+- Where `corner-shape: squircle` is supported, cards and media use continuous (Apple-style) corners with larger radii. Elsewhere they fall back to normal rounded corners.
+
+**3. First screen**
+
+- The hero is a clean light background with an eyebrow, the headline and the 申请拍摄 / 看照片合集 buttons.
+- Below that, the group photo sits in a large rounded card inset from the edges with a soft shadow (`figure.hero-media`). It replaces the old background photo that faded to white.
+- The stats card floats on the bottom edge of the photo as real glass.
+- The login page uses the same background and glow, so logging in feels like one continuous scene.
+
+**4. No colour breaks**
+
+- **One background for the whole page:** a long `#fbfbfd → #f5f5f7` gradient with two very faint glows (green and blue) at the top. Every section, the member area and the footer are transparent on top of it.
+  - Removed: the member area's raised "sheet" edge, the footer's top border, and the hero's background photo along with the line where it ended.
+- **Photo sections** (作品, 申请拍摄, 加入) only show their photo in the middle of the section; the top and bottom fade back to the page colour.
+- **SVG refraction on the glass is now off by default.**
+  - Why: it sampled outside the element and drew a blue or dark line along the bottom of the nav bar and the back-to-top button.
+  - Now: those elements use frosted glass with the specular rim, like Apple's own site.
+  - To turn refraction back on, add `data-refraction="on"` to `<html>`.
+
+**Tested on:**
+
+- headless Chrome at 1280 and 390,
+- Playwright WebKit (iPhone 14 emulation, and 1280 desktop): login, reveal (25/25 elements), hero scroll effect, member login, no page errors.
+
+Screenshots are in `/workspace/v3-shots/r2/`.
+
 ### 16.3 Promote v3 to production (only after the owner approves)
 
 Production secrets are already set, so no secret changes are needed.
@@ -620,5 +672,6 @@ v2 and v3 use the same API, secrets and Feishu data, so rolling back in either d
 
 - The preview shares production's Feishu data, so test submissions are real and must be deleted by hand.
 - Bottom sheets and the tab bar were tested in headless Chrome at 390px and 1280px. Check them on a real iPhone (Safari) before promoting.
-- The `animation-timeline` scroll reveal only runs in Chromium. Other browsers show content statically, which is the intended fallback.
+- As of r2, the scroll reveal runs on `IntersectionObserver` and works in Safari/iOS, which the WebKit test confirmed. The v3 note in §16.2 about `animation-timeline` is superseded.
+- SVG refraction is off by default as of r2 (see §16.2b).
 

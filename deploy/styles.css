@@ -3758,17 +3758,7 @@ body:not(.is-member) #members .members-layout { opacity: 0.72; }
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: none; }
 }
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    /* 动画放在区块的子元素上，区块背景不动 —— 否则相邻同色区块之间会露出白缝 */
-    main > section:not(.hero) { animation: none; }
-    main > section:not(.hero):not(.stat-band) > * {
-      animation: v3-enter linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 45%;
-    }
-  }
-}
+/* （v3 r2：揭示改由 script.js 的 IntersectionObserver 驱动，见文件后部「r2 动效」。）*/
 
 /* —— 11) 手机：底部标签栏 + 底部抽屉式弹窗 —— */
 .tab-bar { display: none; }
@@ -3879,6 +3869,313 @@ body:not(.is-member) #members .members-layout { opacity: 0.72; }
 }
 
 /* ================================================================== *
+ * v3 · r2 精修（2026-10-09）
+ * ------------------------------------------------------------------
+ * 用户反馈：过渡要更「史诗」更顺滑、圆角更柔、登录后首屏重做、
+ * 不要底部淡出的照片、页面不能有明显色块断层、贴近 Apple。
+ *   1) 一套背景：#fbfbfd → #f5f5f7 连续渐变铺满全页，区块本身透明；
+ *      带照片的区块上下两端都收回到同一底色，不再出现色带 / 接缝。
+ *   2) hero：干净底色上的大标题 + 圆角大照片卡（不再是淡出到白的背景图），
+ *      统计卡浮在照片底边上；滚动时照片卡由 0.9 放大到 1、图像视差。
+ *   3) 动效：Apple 长缓动 cubic-bezier(0.22,1,0.36,1)，600–1100ms；
+ *      揭示由 script.js 的 IntersectionObserver 触发（Safari/iOS 可用），
+ *      只动 opacity / translate / transform；弹窗开合都有过渡；按钮带回弹。
+ *   4) 圆角：卡片 28、媒体 32、弹窗 32、按钮胶囊；支持 corner-shape 的
+ *      浏览器用连续曲率（squircle），其余回落为普通圆角。
+ * ================================================================== */
+
+:root {
+  --e-apple: cubic-bezier(0.22, 1, 0.36, 1);
+  --e-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --r-3: 14px;
+  --r-4: 20px;
+  --r-5: 28px;
+  --r-6: 32px;
+  --r-card: 28px;
+  --r-media: 32px;
+  --page-top: #fbfbfd;
+  --page: #f5f5f7;
+}
+
+/* —— 1) 一套连续的背景 —— */
+html { background: var(--page); }
+body {
+  background:
+    radial-gradient(70vmax 46vmax at 10% -6%, rgba(0, 115, 84, 0.07), transparent 62%),
+    radial-gradient(64vmax 42vmax at 96% 2%, rgba(0, 122, 255, 0.06), transparent 62%),
+    linear-gradient(180deg, var(--page-top) 0, var(--page) 1600px);
+  background-repeat: no-repeat;
+  background-color: var(--page);
+}
+main > section,
+main > section[id],
+#member-area, #record, #workspace, #library, #members,
+#timeline, #bilibili, #teams, #events, .stat-band,
+.site-footer {
+  background-color: transparent !important;
+}
+#member-area {
+  border-radius: 0;
+  box-shadow: none !important;
+}
+.site-footer { border-top: 0; }
+/* 照片区块：照片只在中段若隐若现，上下两端都回到页面底色 —— 没有接缝 */
+#request,
+#works,
+#join {
+  background-size: cover;
+  background-position: center;
+}
+#request {
+  background-image:
+    linear-gradient(180deg, var(--page) 0%, rgba(245, 245, 247, 0.86) 22%, rgba(245, 245, 247, 0.80) 50%, rgba(245, 245, 247, 0.86) 78%, var(--page) 100%),
+    url("assets/events/recruitment-booth-music.webp");
+}
+#works {
+  background-image:
+    linear-gradient(180deg, var(--page) 0%, rgba(245, 245, 247, 0.88) 22%, rgba(245, 245, 247, 0.82) 50%, rgba(245, 245, 247, 0.88) 78%, var(--page) 100%),
+    url("assets/events/figaro-stage.webp");
+}
+#join {
+  background-image:
+    linear-gradient(180deg, var(--page) 0%, rgba(245, 245, 247, 0.86) 22%, rgba(245, 245, 247, 0.80) 50%, rgba(245, 245, 247, 0.86) 78%, var(--page) 100%),
+    url("assets/events/orchestra-rehearsal.webp");
+}
+/* 无封面活动卡与页面同一家族的色温 */
+.timeline-list article.tile:not(.has-cover) {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(0, 122, 255, 0.08), transparent 55%),
+    radial-gradient(120% 90% at 100% 100%, rgba(255, 149, 0, 0.08), transparent 55%),
+    #fff;
+}
+/* 顶部阅读进度条：更细、更轻，不再像一条黑线 */
+#scroll-progress { height: 2px; background: rgba(29, 29, 31, 0.35); }
+
+/* —— 2) hero：大标题 + 圆角照片卡 —— */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  padding: clamp(104px, 13vh, 140px) 0 0;
+  background: transparent !important;
+  background-image: none !important;
+  overflow: visible;
+}
+.hero::before, .hero::after { display: none !important; }
+.hero h1 { text-shadow: none; margin: 0; }
+.hero-content {
+  width: 100%;
+  max-width: 1080px;
+  padding: 0 22px;
+  text-align: center;
+  background: transparent !important;
+}
+.hero-eyebrow {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: clamp(15px, 1.4vw, 19px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #007354;
+  background: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.hero h1 { font-size: clamp(34px, 5vw, 64px); line-height: 1.08; letter-spacing: -0.022em; text-wrap: balance; }
+.hero-actions { margin-top: 28px; }
+.hero-media {
+  position: relative;
+  width: min(1200px, calc(100% - 48px));
+  aspect-ratio: 16 / 9;
+  margin: clamp(32px, 4.4vw, 52px) auto 0;
+  overflow: hidden;
+  border-radius: var(--r-media);
+  isolation: isolate;
+  background: #e8e8ed;
+  transform-origin: 50% 100%;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.05),
+    0 30px 80px -10px rgba(0, 0, 0, 0.22) !important;
+}
+.hero-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 38%;
+  border-radius: inherit;
+}
+/* 统计卡浮在照片卡底边上 —— 这是唯一一块压在照片上的玻璃，模糊才有意义 */
+.stat-band { padding: 0 22px 24px; }
+.stat-band .hero-rail {
+  position: relative;
+  z-index: 3;
+  margin: -64px auto 0 !important;
+  max-width: 960px;
+  border-radius: var(--r-card);
+}
+@media (max-width: 820px) {
+  .hero { padding-top: 104px; }
+  .hero-media { width: calc(100% - 32px); aspect-ratio: 4 / 3.4; border-radius: 28px; }
+  .stat-band { padding-inline: 24px; }
+  .stat-band .hero-rail { margin: -40px auto 0 !important; }
+}
+
+/* —— 3) 圆角：统一阶梯，图片随卡片裁切 —— */
+.record-card, .platform-card, .board-panel, .archive-card, .video-card-item,
+.team-panel, .action-tile, .member-form, .member-roster, .event-track,
+.request-form, .join-form, .member-locked, .empty-state,
+.timeline-list article.tile, .skel {
+  border-radius: var(--r-card) !important;
+}
+.shot, .skel-shot, .roster-card, .group-card { border-radius: 22px !important; }
+.timeline-list article.tile, .shot, .video-card-item, .archive-card, .video-cover {
+  overflow: hidden;
+  isolation: isolate;
+}
+.shot img, .tile-img, .video-cover { border-radius: inherit; }
+.modal-card, .modal-card--wide { border-radius: var(--r-media) !important; }
+.action-icon { border-radius: 12px; }
+input, select, textarea { border-radius: var(--r-3); }
+textarea { border-radius: 18px; }
+/* 连续曲率（Apple 的 squircle）：支持的浏览器才开，同时把半径放大，观感与普通圆角一致 */
+@supports (corner-shape: squircle) {
+  .record-card, .platform-card, .board-panel, .archive-card, .video-card-item,
+  .team-panel, .action-tile, .member-form, .member-roster, .event-track,
+  .request-form, .join-form, .member-locked, .empty-state,
+  .timeline-list article.tile, .hero-media, .modal-card, .modal-card--wide,
+  .shot, .stat-band .hero-rail, .action-icon {
+    corner-shape: squircle;
+  }
+  :root { --r-card: 44px; --r-media: 52px; }
+  .shot, .roster-card, .group-card { border-radius: 34px !important; }
+  .action-icon { border-radius: 20px; }
+}
+
+/* —— 4) 动效 —— */
+/* 4a) 停用旧的 scroll-timeline 推拉（只在 Chromium 生效，且与 JS 揭示冲突） */
+main > section:not(.hero) { animation: none !important; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 4b) 首屏入场（登录后进站的那一下）：眉标 → 标题 → 按钮 → 照片卡 → 统计卡 */
+  @keyframes r2-rise {
+    from { opacity: 0; translate: 0 26px; }
+    to   { opacity: 1; translate: 0 0; }
+  }
+  @keyframes r2-media-in {
+    from { opacity: 0; scale: 0.94; }
+    to   { opacity: 1; scale: 1; }
+  }
+  @keyframes r2-soft-in {
+    from { opacity: 0; translate: 0 24px; filter: blur(10px); }
+    to   { opacity: 1; translate: 0 0; filter: blur(0); }
+  }
+  .motion .hero-content { animation: none !important; }
+  .motion .hero-content > .hero-eyebrow { animation: r2-rise 900ms var(--e-apple) 60ms both; }
+  .motion .hero-content > h1           { animation: r2-soft-in 1100ms var(--e-apple) 140ms both; }
+  .motion .hero-content > .hero-actions { animation: r2-rise 900ms var(--e-apple) 300ms both; }
+  .motion .hero-media                  { animation: r2-media-in 1300ms var(--e-apple) 380ms both; }
+  .motion .stat-band .hero-rail        { animation: r2-rise 1000ms var(--e-apple) 640ms both !important; }
+
+  /* 4c) 滚动叙事：--hp 由 script.js 写入（0 → 1） */
+  .motion .hero-media {
+    transform: scale(calc(0.94 + 0.06 * var(--hp, 0)));
+    will-change: transform;
+  }
+  .motion .hero-media img {
+    transform: translate3d(0, calc(var(--hp, 0) * -5%), 0) scale(1.1);
+    will-change: transform;
+  }
+  .motion .hero-content {
+    opacity: calc(1 - var(--hp, 0) * 1.15);
+    transform: translate3d(0, calc(var(--hp, 0) * -56px), 0);
+  }
+
+  /* 4d) 区块揭示：标题柔焦变清晰，内容上浮，网格子项错开 */
+  .motion .rv {
+    opacity: 0;
+    translate: 0 48px;
+    transition:
+      opacity 900ms var(--e-apple) var(--rv-d, 0ms),
+      translate 1100ms var(--e-apple) var(--rv-d, 0ms),
+      filter 900ms var(--e-apple) var(--rv-d, 0ms);
+  }
+  .motion .rv.rv-soft { filter: blur(10px); }
+  .motion .rv.in { opacity: 1; translate: 0 0; filter: none; }
+  @keyframes r2-child {
+    from { opacity: 0; translate: 0 32px; }
+    to   { opacity: 1; translate: 0 0; }
+  }
+  .motion .rv.in:is(.timeline-list, .gallery-grid, .video-grid, .archive-grid, .member-actions, .team-layout, .board-grid, .event-track) > *,
+  .motion .rv.in :is(.timeline-list, .gallery-grid, .video-grid, .archive-grid, .member-actions, .team-layout, .board-grid, .event-track) > * {
+    animation: r2-child 900ms var(--e-apple) both;
+    animation-delay: calc(var(--ci, 0) * 80ms + 140ms);
+  }
+
+  /* 4e) 导航玻璃：滚动后更实，过渡拉长 */
+  .site-header {
+    transition:
+      background-color 600ms var(--e-apple),
+      box-shadow 600ms var(--e-apple),
+      border-color 600ms var(--e-apple) !important;
+  }
+
+  /* 4f) 按压回弹：按下快、松开带一点过冲 */
+  .button, .member-toggle, #upload-entry, .action-tile, .tab-bar a, .modal-close {
+    transition:
+      transform 520ms var(--e-spring),
+      background 240ms ease,
+      box-shadow 400ms var(--e-apple),
+      color 240ms ease;
+  }
+  .button:active, .member-toggle:active, #upload-entry:active, .action-tile:active, .modal-close:active {
+    transform: scale(0.96);
+    transition-duration: 120ms;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .record-card, .archive-card, .video-card-item, .action-tile, .shot {
+      transition: transform 600ms var(--e-apple), box-shadow 600ms var(--e-apple);
+    }
+  }
+}
+
+/* 4g) 弹窗开合：始终渲染，用透明度 + 可见性过渡，关的时候也有动画 */
+body .modal {
+  display: grid !important;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms var(--e-apple), visibility 0s linear 420ms;
+}
+body .modal.is-open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 420ms var(--e-apple), visibility 0s;
+}
+body .modal .modal-card {
+  animation: none !important;
+  transform: translate3d(0, 28px, 0) scale(0.96);
+  transition: transform 640ms var(--e-apple);
+}
+body .modal.is-open .modal-card { transform: none; }
+@media (max-width: 820px) {
+  body .modal .modal-card {
+    transform: translate3d(0, 105%, 0);
+    transition: transform 560ms cubic-bezier(0.32, 0.72, 0, 1);
+    border-radius: 32px 32px 0 0 !important;
+  }
+  body .modal.is-open .modal-card { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body .modal, body .modal.is-open, body .modal .modal-card { transition: none !important; }
+  body .modal .modal-card { transform: none !important; }
+}
+
+/* ================================================================== *
  * 可访问性兜底 —— 必须留在文件最末
  * ------------------------------------------------------------------
  * 上面的玻璃规则用了 !important，同权重下后写的胜出，
@@ -3941,4 +4238,13 @@ body:not(.is-member) #members .members-layout { opacity: 0.72; }
 }
 @media (prefers-contrast: more) {
   .tab-bar, .stat-band .hero-rail, .action-tile, .member-locked { box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.5) !important; }
+}
+
+/* r2 的无障碍兜底 —— 留在最末 */
+@media (prefers-reduced-motion: reduce) {
+  .hero-media, .hero-media img, .hero-content { transform: none !important; opacity: 1 !important; animation: none !important; }
+  .rv { opacity: 1 !important; translate: none !important; filter: none !important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .stat-band .hero-rail { background: #fff !important; }
 }

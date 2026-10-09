@@ -150,32 +150,79 @@
   window.addEventListener("resize", updateSpy);
   updateSpy();
 
-  /* ============ 滚动进入视口动画 ============
-   * 支持滚动驱动动画时交给 CSS 的推拉效果（位置跟手指走、可反向退回），
-   * 这套一次性淡入只作为老浏览器的回退，两者同时开会互相打架。 */
-  const hasScrollTimeline =
-    window.CSS && CSS.supports && CSS.supports("animation-timeline", "view()");
-  if ("IntersectionObserver" in window && !hasScrollTimeline) {
-    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!reduced) {
-      const io = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((en) => {
-            if (en.isIntersecting) {
-              en.target.classList.add("in-view");
-              io.unobserve(en.target);
-            }
+  /* ============ v3 动效：入场揭示 + hero 滚动叙事 ============
+   * 不依赖 CSS scroll-timeline（Safari / iOS 不支持），改用
+   * IntersectionObserver 触发揭示，rAF 节流的滚动处理驱动 hero 缩放 / 视差。
+   * 只动 opacity / translate / transform，保证 60fps。
+   * 渐进增强：<head> 里的内联脚本给 <html> 加 .motion；
+   * 只有这里给元素加了 .rv，它们才会被隐藏 —— JS 出错时内容照常显示。 */
+  (function setupMotion() {
+    var root = document.documentElement;
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) { if (root.classList) root.classList.remove("motion"); return; }
+    if (!root.classList || !root.classList.contains("motion")) return;
+
+    /* —— 1) 区块揭示：标题先到，内容错开跟上 —— */
+    var GRID = ".timeline-list, .gallery-grid, .video-grid, .archive-grid, .member-actions, .team-layout, .board-grid, .event-track";
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          var el = en.target;
+          var grids = el.matches && el.matches(GRID) ? [el] : Array.prototype.slice.call(el.querySelectorAll ? el.querySelectorAll(GRID) : []);
+          grids.forEach(function (g) {
+            Array.prototype.forEach.call(g.children, function (c, i) { c.style.setProperty("--ci", Math.min(i, 8)); });
           });
-        },
-        { threshold: 0.12, rootMargin: "0px 0px -48px 0px" }
-      );
-      document.querySelectorAll("main > section").forEach((s) => {
-        if (s.classList.contains("hero")) return; // 首屏 hero 不做隐藏动画，避免闪烁
-        s.classList.add("reveal");
-        io.observe(s);
+          el.classList.add("in");
+          io.unobserve(el);
+        });
+      }, { threshold: 0.06, rootMargin: "0px 0px -6% 0px" });
+      document.querySelectorAll("main > section:not(.hero):not(.stat-band)").forEach(function (sec) {
+        Array.prototype.forEach.call(sec.children, function (child, i) {
+          child.classList.add("rv");
+          if (child.matches(".section-heading, .section-copy, .request-copy, .join-copy")) child.classList.add("rv-soft");
+          child.style.setProperty("--rv-d", Math.min(i, 3) * 110 + "ms");
+          io.observe(child);
+        });
       });
+      /* 保险：快速跳转（锚点、一次大幅滚动）时 IO 可能来不及报告途经的元素。
+       * 滚动停下 160ms 后，把顶部已经进入或越过视口底边的元素全部揭示，
+       * 保证不会有内容一直停在隐藏状态。 */
+      var sweepTimer = 0;
+      var sweep = function () {
+        var vh = window.innerHeight || 800;
+        document.querySelectorAll(".rv:not(.in)").forEach(function (el) {
+          if (el.getBoundingClientRect().top < vh) { el.classList.add("in"); io.unobserve(el); }
+        });
+      };
+      window.addEventListener("scroll", function () {
+        clearTimeout(sweepTimer);
+        sweepTimer = setTimeout(sweep, 160);
+      }, { passive: true });
+      window.addEventListener("load", sweep);
     }
-  }
+
+    /* —— 2) hero 滚动叙事：照片卡从 0.9 放大到 1，图像轻微视差，标题淡出 —— */
+    var hero = document.querySelector(".hero");
+    if (!hero || !window.requestAnimationFrame) return;
+    var ticking = false, last = -1;
+    function frame() {
+      ticking = false;
+      var y = window.scrollY || window.pageYOffset || 0;
+      var vh = window.innerHeight || 800;
+      var p = Math.min(1, Math.max(0, y / (vh * 0.75)));
+      p = Math.round(p * 1000) / 1000;
+      if (p === last) return;
+      last = p;
+      hero.style.setProperty("--hp", p);
+    }
+    function onScroll() {
+      if (!ticking) { ticking = true; window.requestAnimationFrame(frame); }
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    frame();
+  })();
 
   /* ============ Liquid Glass 折射 ============ *
    * 全站所有玻璃面共用同一套材质：模糊 + 折射 + 镜面边。
@@ -388,7 +435,13 @@
       });
     }
   }
-  setupLiquidGlass();
+  /* v3 r2：折射默认关闭。SVG 位移在玻璃边缘会采样到背景区域之外，
+   * 在浅色页面上表现为导航条 / 回顶部按钮边上的一条蓝色或深色细线。
+   * 改用 Apple 网页同款的磨砂玻璃 + 镜面内高光（CSS 已有）。
+   * 想恢复折射：给 <html> 加 data-refraction="on"。 */
+  if (document.documentElement.getAttribute && document.documentElement.getAttribute("data-refraction") === "on") {
+    setupLiquidGlass();
+  }
 
   /* ============ 回到顶部 ============ */
   const backTop = document.querySelector("#back-to-top");

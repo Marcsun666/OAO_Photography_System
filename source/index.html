@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f5f5f7" />
+    <!-- 渐进增强：只有能跑 JS、且没开「减弱动态效果」时才启用入场动效 -->
+    <script>
+      if (!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) {
+        document.documentElement.classList.add("motion");
+      }
+    </script>
     <title>OAO 摄影社 | 社团活动记录站</title>
     <meta name="description" content="OAO 摄影社 · 社团活动记录站：记录社团活动、整理照片视频、沉淀每一次校园现场。" />
     <meta property="og:title" content="OAO 摄影社 | 社团活动记录站" />
@@ -91,6 +97,10 @@
             <a class="button glass" href="#works">看照片合集</a>
           </div>
         </div>
+        <figure class="hero-media" id="hero-media">
+          <img src="assets/events/stage-group-photo.webp" width="1600" height="1067"
+               alt="OAO 摄影社成员在舞台上的合影" decoding="async" fetchpriority="high" />
+        </figure>
       </section>
 
       <section class="stat-band" aria-label="社团亮点">

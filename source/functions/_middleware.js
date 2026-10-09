@@ -100,64 +100,74 @@ function loginPage({ next = "/", error = false, status = 401 } = {}) {
 <meta name="robots" content="noindex, nofollow" />
 <title>OAO 摄影社 · 成员登录</title>
 <style>
-  /* v3：与站点同一套 Liquid Glass —— 柔和极光底 + 玻璃卡片；无外链资源 */
-  :root { color-scheme: light; --green: #007354; --ink: #1d1d1f; --text: #1d1d1f; --muted: #6e6e73; --ease: cubic-bezier(0.32, 0.72, 0, 1); }
+  /* v3 r2：与站点首屏同一套底色与光晕，登录 → 进站是一段连续的过渡；无外链资源 */
+  :root { color-scheme: light; --green: #007354; --text: #1d1d1f; --muted: #6e6e73;
+    --e: cubic-bezier(0.22, 1, 0.36, 1); --spring: cubic-bezier(0.34, 1.4, 0.64, 1); }
   * { box-sizing: border-box; }
-  html, body { min-height: 100%; }
+  html { background: #f5f5f7; }
   body {
     margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
     padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
     color: var(--text);
     background:
-      radial-gradient(60vmax 50vmax at 12% 8%, rgba(0, 115, 84, 0.16), transparent 60%),
-      radial-gradient(55vmax 45vmax at 92% 18%, rgba(0, 122, 255, 0.14), transparent 60%),
-      radial-gradient(60vmax 50vmax at 70% 100%, rgba(255, 149, 0, 0.12), transparent 60%),
-      #f5f5f7;
+      radial-gradient(70vmax 46vmax at 10% -6%, rgba(0, 115, 84, 0.10), transparent 62%),
+      radial-gradient(64vmax 42vmax at 96% 2%, rgba(0, 122, 255, 0.08), transparent 62%),
+      linear-gradient(180deg, #fbfbfd 0, #f5f5f7 100%);
+    background-repeat: no-repeat; background-color: #f5f5f7;
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
       "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
   main {
     width: 100%; max-width: 400px; text-align: center;
-    padding: 40px 32px 30px; border-radius: 32px;
-    background: rgba(255, 255, 255, 0.94);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(0, 0, 0, 0.06),
-      0 2px 6px rgba(0, 0, 0, 0.04), 0 24px 64px rgba(0, 0, 0, 0.12);
-    animation: rise 600ms var(--ease) both;
+    padding: 44px 32px 30px; border-radius: 32px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(0, 0, 0, 0.05),
+      0 2px 6px rgba(0, 0, 0, 0.04), 0 30px 80px -10px rgba(0, 0, 0, 0.16);
+    transition: opacity 520ms var(--e), transform 620ms var(--e), filter 520ms var(--e);
   }
+  @supports (corner-shape: squircle) { main { corner-shape: squircle; border-radius: 52px; } }
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    main { background: rgba(255, 255, 255, 0.66); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
+    main { background: rgba(255, 255, 255, 0.72); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
   }
-  @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(0.985); } to { opacity: 1; transform: none; } }
-  .logo { display: block; width: 156px; height: auto; margin: 0 auto 24px; }
-  h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; letter-spacing: -0.018em; line-height: 1.15; }
-  .sub { margin: 0 0 26px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+  @keyframes rise { from { opacity: 0; transform: translateY(22px) scale(0.97); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+  @keyframes item { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  main { animation: rise 900ms var(--e) both; }
+  main > * { animation: item 800ms var(--e) both; }
+  main > :nth-child(2) { animation-delay: 120ms; }
+  main > :nth-child(3) { animation-delay: 180ms; }
+  main > :nth-child(4) { animation-delay: 240ms; }
+  main > :nth-child(5) { animation-delay: 300ms; }
+  /* 提交后：卡片轻轻后退、变虚，站点首屏在同一底色上接着淡入 */
+  body.leaving main { opacity: 0; transform: scale(0.96) translateY(-8px); filter: blur(6px); }
+  .logo { display: block; width: 148px; height: auto; margin: 0 auto 22px; }
+  h1 { margin: 0 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
+  .sub { margin: 0 0 28px; color: var(--muted); font-size: 15px; line-height: 1.55; }
   form { display: grid; gap: 10px; text-align: left; }
   label { padding-left: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
   input[type="password"] {
-    width: 100%; height: 50px; padding: 0 16px; border: 0; border-radius: 14px;
+    width: 100%; height: 52px; padding: 0 18px; border: 0; border-radius: 16px;
     background: rgba(118, 118, 128, 0.12); color: var(--text); font: inherit; font-size: 17px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
-    outline: 2px solid transparent; transition: background 160ms ease, outline-color 160ms ease;
+    outline: 2px solid transparent; transition: background 240ms var(--e), outline-color 240ms var(--e), box-shadow 240ms var(--e);
   }
   input[type="password"]:hover { background: rgba(118, 118, 128, 0.16); }
-  input[type="password"]:focus { background: #fff; outline-color: var(--green); }
-  input[aria-invalid="true"], input[aria-invalid="true"]:focus { outline-color: #d70015; background: #fff; }
+  input[type="password"]:focus { background: #fff; outline-color: var(--green); box-shadow: 0 0 0 6px rgba(0, 115, 84, 0.12); }
+  input[aria-invalid="true"], input[aria-invalid="true"]:focus { outline-color: #d70015; background: #fff; box-shadow: 0 0 0 6px rgba(215, 0, 21, 0.10); }
   button {
-    height: 50px; margin-top: 8px; border: 0; border-radius: 980px; cursor: pointer;
+    height: 52px; margin-top: 10px; border: 0; border-radius: 980px; cursor: pointer;
     background: linear-gradient(180deg, #3a3a3c 0%, #1d1d1f 100%); color: #fff;
     font: inherit; font-size: 17px; font-weight: 600;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(0, 0, 0, 0.18), 0 8px 20px rgba(0, 0, 0, 0.14);
-    transition: background 160ms ease, transform 200ms var(--ease), box-shadow 200ms var(--ease);
+    transition: background 200ms ease, transform 520ms var(--spring), box-shadow 300ms var(--e);
   }
   button:hover { background: linear-gradient(180deg, #2c2c2e 0%, #000 100%); }
-  button:active { transform: scale(0.97); }
+  button:active { transform: scale(0.96); transition-duration: 120ms; }
   button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
   .error { margin: 2px 0 0; color: #d70015; font-size: 14px; text-align: center; }
   .foot { margin: 24px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-  @media (max-width: 440px) { main { padding: 34px 22px 26px; border-radius: 28px; } }
+  @media (max-width: 440px) { main { padding: 38px 22px 26px; } }
   @media (prefers-reduced-transparency: reduce) { main { background: #fff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; } }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
@@ -174,6 +184,20 @@ function loginPage({ next = "/", error = false, status = 401 } = {}) {
   </form>
   <p class="foot">登录后 30 天内无需再次输入 · 密码请向社团负责人索取</p>
 </main>
+<script>
+  /* 提交时先让卡片退场，再真正提交；JS 不可用时表单照常提交 */
+  (function () {
+    var f = document.querySelector("form"), done = false;
+    if (!f) return;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    f.addEventListener("submit", function (e) {
+      if (done || reduce) return;
+      e.preventDefault(); done = true;
+      document.body.classList.add("leaving");
+      setTimeout(function () { f.submit(); }, 380);
+    });
+  })();
+</script>
 </body>
 </html>`;
   return new Response(html, {
