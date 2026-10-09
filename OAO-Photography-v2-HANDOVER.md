@@ -3,6 +3,7 @@
 > **Version:** v2, with a live backend. Snapshot taken 2026-10-08.
 > **Live URL:** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
 > **Source:** the `OAO-Photography-v2-source.zip` that came with this file. It is also backed up in the private GitHub repo `Marcsun666/OAO_Photography_System` (tag `v2`; see §11).
+> **v3 status (2026-10-08):** v3 is a style refinement. It is deployed as a **preview only** at <https://v3.oao-photography.pages.dev> (git branch `v3`). Production is still v2. See §16 for the promote and rollback steps.
 > **Language:** this doc is in English. Chinese UI text and Feishu table/field names are quoted exactly. Never translate them in code.
 
 ---
@@ -488,6 +489,7 @@ Use this only if needed. It requires Tencent real-name verification, which the o
   - Middleware returns JSON 401 for `/api` and blocks `/cloud-function/*`.
   - Added `tools/feishu/*` and `tools/build-deploy.sh`; SETUP.md has the 2A/2B sections.
   - Verified end to end: every route, uploads of 676 B, 3.3 MB and 8 MB with byte-identical download, one real DeepSeek call, and headless Chrome showing live data with no demo badge.
+- **v3: style and flow refinement**, 2026-10-08. **Preview only** until the owner approves it. See §16.
 
 ---
 
@@ -524,3 +526,99 @@ Also: in `cd source/tools/feishu`, run `python3 verify.py`. It should end with `
 - **Account access:** Cloudflare, the Feishu developer console and admin approval, the Feishu Base, DeepSeek billing, GitHub.
 - **Live data:** every activity, photo, link and member record is in Feishu only.
 - **Large and private images:** `assets/media/` and `assets-originals/`.
+
+---
+
+## 16. v3: style refinement (preview), promote and rollback
+
+**Status:** v3 is deployed to the Cloudflare Pages **preview** branch `v3`. Production (`main`) is still v2, deployment `7fdceb9d-4d26-4711-bc9b-cc9b993579c7`.
+
+- Preview URL: <https://v3.oao-photography.pages.dev>. It uses the same site password as production.
+- Git: branch `v3` in `Marcsun666/OAO_Photography_System`. `main`, tag `v2` and branch `v2` are unchanged.
+- Backend, API routes, Feishu schema and `config.js` are **unchanged**. v3 only touches `index.html`, `styles.css`, `app.js`, `script.js` and the login page HTML/CSS inside `functions/_middleware.js`. The login logic is unchanged.
+
+### 16.1 Preview environment secrets
+
+The Pages **preview** environment has its own copy of all 14 secrets (same names as §6). Set them with:
+
+```bash
+cd /tmp/cfwork   # any folder; it only needs a package.json
+printf %s "$VALUE" | wrangler pages secret put NAME --project-name oao-photography --env preview
+```
+
+The values match production with two exceptions:
+
+- `MEMBER_TOKEN` is a **different** random value. Member sessions from the preview do not work on production, and production sessions do not work on the preview.
+- `ALLOWED_ORIGIN=https://v3.oao-photography.pages.dev`
+
+`MEMBER_PASSCODE` and `SITE_PASSWORD` are the same as production. The preview reads and writes the **same Feishu Base** as production, so anything you submit on the preview is real data.
+
+### 16.2 What changed in v3
+
+Design (the v2 "Apple + Liquid Glass" look, refined rather than replaced):
+
+- **One set of shadow and motion tokens** (`--v3-shadow-1/2/3`, `--v3-ease`). Cards use a white surface, a hairline edge and a layered soft shadow. Cards lift on hover only for mouse or trackpad users, and buttons and tiles scale down slightly when pressed.
+- **Hero.**
+  - Added a frosted eyebrow pill ("OAO 摄影社 · 照片组 / 视频组").
+  - Added a primary button 申请拍摄 and a glass secondary button 看照片合集.
+  - The stats band is now a floating glass card that overlaps the bottom edge of the hero, with tabular numbers and dividers between items.
+- **Glossy primary pill.** The primary button has a subtle top-to-bottom graphite gradient plus an inner highlight. Glass elements fall back to solid surfaces when `backdrop-filter` is unsupported or reduced transparency is requested.
+- **Typography.** One heading and lede scale, using `clamp()`. The PingFang stack is kept and no web fonts are loaded.
+- **Activity cards without a cover** get a soft blue and orange gradient instead of a flat grey block. A single activity is centred at a 640px maximum width instead of filling half the grid.
+- **Scroll reveal.** Removed the v2 `sec-leave` effect, which faded sections to 50% opacity as they scrolled away and hurt readability. The enter animation now runs on each section's children, so section backgrounds never leave white gaps.
+- **Loading.** While Feishu responds (3–7 s), skeleton shimmer placeholders replace the static sample content. A failed load shows an error card with a 重试 button.
+- **Mobile (≤ 820px).**
+  - A floating glass bottom tab bar: 活动 · 作品 · **申请拍摄** (emphasised) · B站 · 成员. It respects the safe-area inset.
+  - Modals open as bottom sheets with a grab handle.
+  - The 上传 button uses a short label on small screens.
+  - The back-to-top button and toasts sit above the tab bar.
+- **Login page.** Same visual language: an aurora gradient background and a glass card with a graphite pill button. There are no external resources.
+- **Accessibility.**
+  - A v3 block at the very end of `styles.css` handles `prefers-reduced-transparency`, `prefers-reduced-motion` and `prefers-contrast: more`.
+  - The v2 accessibility block is still in place.
+  - All glass elements have solid fallbacks.
+
+Flow:
+
+- **Sections reordered** into the student path first: 活动 → 作品 → B站 → 申请拍摄 → 关于/加入. Member tools follow, grouped behind a new **成员工作区** section that looks like a raised sheet on grey: 成员工作区 → 记录方式 → 工作台 → 资料库 → 名册/AI 分组. The nav and footer follow the same order.
+- **成员工作区 quick actions:** 上传照片 · 贴网盘链接 · 贴 B站/小红书 · 名册·AI 分组.
+  - When a logged-out user taps a tile, the login modal opens.
+  - After a successful login, the original action continues automatically (a pending action).
+- **Upload modal has a third mode, "B站 / 小红书".** It posts to the existing `/api/links` route, so Bilibili and Xiaohongshu links can be added without opening Feishu. The activity field is hidden in this mode.
+- **Request form has a new required field 联系人与联系方式.** It is appended to the description as `联系人：…`, so no Feishu schema change was needed. The copy and success message are clearer.
+- **Join form copy is honest.** The join form is still UI-only (nothing is saved), and the copy now says so.
+- **Better empty states** that point to the next action.
+
+### 16.3 Promote v3 to production (only after the owner approves)
+
+Production secrets are already set, so no secret changes are needed.
+
+```bash
+export PATH=/home/box/.local/bin:/home/box/.local/node-v22.11.0-linux-x64/bin:$PATH WRANGLER_CACHE_DIR=/tmp/wcache
+cd /workspace/oao-deploy-v3        # or: bash tools/build-deploy.sh <dir> from the v3 branch's source/
+rm -rf .wrangler && wrangler pages deploy . --project-name oao-photography --branch main --commit-dirty=true
+```
+
+Then, optionally, merge or fast-forward git `main` to `v3`.
+
+### 16.4 Roll back to v2
+
+Use either option.
+
+- **Fastest (dashboard).** Go to Cloudflare → Workers & Pages → `oao-photography` → Deployments, find deployment `7fdceb9d-4d26-4711-bc9b-cc9b993579c7`, then choose ⋯ → **Rollback to this deployment**.
+- **CLI.** Redeploy the v2 build:
+
+  ```bash
+  export PATH=/home/box/.local/bin:/home/box/.local/node-v22.11.0-linux-x64/bin:$PATH WRANGLER_CACHE_DIR=/tmp/wcache
+  cd /workspace/v2-backup/oao-deploy  # or the deploy/ folder from git tag v2
+  rm -rf .wrangler && wrangler pages deploy . --project-name oao-photography --branch main --commit-dirty=true
+  ```
+
+v2 and v3 use the same API, secrets and Feishu data, so rolling back in either direction loses no data. To discard the preview completely, delete the `v3` preview deployments in the dashboard. You can also leave them, since they are behind the same password.
+
+### 16.5 Known v3 notes
+
+- The preview shares production's Feishu data, so test submissions are real and must be deleted by hand.
+- Bottom sheets and the tab bar were tested in headless Chrome at 390px and 1280px. Check them on a real iPhone (Safari) before promoting.
+- The `animation-timeline` scroll reveal only runs in Chromium. Other browsers show content statically, which is the intended fallback.
+

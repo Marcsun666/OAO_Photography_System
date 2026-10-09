@@ -124,6 +124,7 @@
 
   /* ============ 导航滚动高亮（scrollspy） ============ */
   const navLinks = Array.prototype.slice.call(document.querySelectorAll(".nav-links a[href^='#']"));
+  const tabLinks = Array.prototype.slice.call(document.querySelectorAll(".tab-bar a[href^='#']"));
   const spySections = navLinks
     .map((a) => document.querySelector(a.getAttribute("href")))
     .filter(Boolean);
@@ -136,6 +137,14 @@
       if (sec && sec.offsetTop <= pos) current = navLinks[i];
     });
     navLinks.forEach((a) => a.classList.toggle("active", a === current));
+    // v3：手机底部标签栏跟着高亮（首屏 hero 时不高亮任何一项）
+    const href = (window.scrollY || 0) > 240 ? current.getAttribute("href") : "";
+    tabLinks.forEach((a) => {
+      const on = a.getAttribute("href") === href;
+      a.classList.toggle("active", on);
+      if (on) a.setAttribute("aria-current", "location");
+      else a.removeAttribute("aria-current");
+    });
   }
   window.addEventListener("scroll", updateSpy, { passive: true });
   window.addEventListener("resize", updateSpy);
@@ -476,7 +485,7 @@
       const data = new FormData(joinForm);
       const name = data.get("name").trim() || "同学";
       const track = data.get("track");
-      formStatus.textContent = `${name}，已收到你的 ${track} 意向。本地 UI 模拟提交成功。`;
+      formStatus.textContent = `${name}，你的「${track}」意向已填好。这里暂不保存，正式报名请留意社团群通知。`;
       joinForm.reset();
     });
   }

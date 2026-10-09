@@ -95,45 +95,69 @@ function loginPage({ next = "/", error = false, status = 401 } = {}) {
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#f5f5f7" />
 <meta name="robots" content="noindex, nofollow" />
 <title>OAO 摄影社 · 成员登录</title>
 <style>
-  :root { color-scheme: light; --green: #007354; --green-press: #005f45; --text: #1d1d1f; --muted: #6e6e73; }
+  /* v3：与站点同一套 Liquid Glass —— 柔和极光底 + 玻璃卡片；无外链资源 */
+  :root { color-scheme: light; --green: #007354; --ink: #1d1d1f; --text: #1d1d1f; --muted: #6e6e73; --ease: cubic-bezier(0.32, 0.72, 0, 1); }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html, body { min-height: 100%; }
   body {
-    margin: 0; display: grid; place-items: center; padding: 24px;
-    background: #ffffff; color: var(--text);
+    margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
+    padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+    color: var(--text);
+    background:
+      radial-gradient(60vmax 50vmax at 12% 8%, rgba(0, 115, 84, 0.16), transparent 60%),
+      radial-gradient(55vmax 45vmax at 92% 18%, rgba(0, 122, 255, 0.14), transparent 60%),
+      radial-gradient(60vmax 50vmax at 70% 100%, rgba(255, 149, 0, 0.12), transparent 60%),
+      #f5f5f7;
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
       "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  main { width: 100%; max-width: 380px; text-align: center; }
-  .logo { display: block; width: 168px; height: auto; margin: 0 auto 28px; }
-  h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.15; }
-  .sub { margin: 0 0 28px; color: var(--muted); font-size: 15px; line-height: 1.5; }
-  form { display: grid; gap: 12px; text-align: left; }
-  label { font-size: 13px; font-weight: 500; color: var(--muted); }
-  input[type="password"] {
-    width: 100%; height: 48px; padding: 0 16px; border: 0; border-radius: 14px;
-    background: rgba(0, 0, 0, 0.045); color: var(--text); font: inherit; font-size: 17px;
-    outline: 2px solid transparent; transition: background 140ms ease, outline-color 140ms ease;
+  main {
+    width: 100%; max-width: 400px; text-align: center;
+    padding: 40px 32px 30px; border-radius: 32px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+      0 2px 6px rgba(0, 0, 0, 0.04), 0 24px 64px rgba(0, 0, 0, 0.12);
+    animation: rise 600ms var(--ease) both;
   }
-  input[type="password"]:hover { background: rgba(0, 0, 0, 0.07); }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    main { background: rgba(255, 255, 255, 0.66); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(0.985); } to { opacity: 1; transform: none; } }
+  .logo { display: block; width: 156px; height: auto; margin: 0 auto 24px; }
+  h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; letter-spacing: -0.018em; line-height: 1.15; }
+  .sub { margin: 0 0 26px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+  form { display: grid; gap: 10px; text-align: left; }
+  label { padding-left: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
+  input[type="password"] {
+    width: 100%; height: 50px; padding: 0 16px; border: 0; border-radius: 14px;
+    background: rgba(118, 118, 128, 0.12); color: var(--text); font: inherit; font-size: 17px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    outline: 2px solid transparent; transition: background 160ms ease, outline-color 160ms ease;
+  }
+  input[type="password"]:hover { background: rgba(118, 118, 128, 0.16); }
   input[type="password"]:focus { background: #fff; outline-color: var(--green); }
   input[aria-invalid="true"], input[aria-invalid="true"]:focus { outline-color: #d70015; background: #fff; }
   button {
-    height: 48px; margin-top: 4px; border: 0; border-radius: 980px; cursor: pointer;
-    background: var(--green); color: #fff; font: inherit; font-size: 17px; font-weight: 500;
-    transition: background 140ms ease, transform 100ms ease;
+    height: 50px; margin-top: 8px; border: 0; border-radius: 980px; cursor: pointer;
+    background: linear-gradient(180deg, #3a3a3c 0%, #1d1d1f 100%); color: #fff;
+    font: inherit; font-size: 17px; font-weight: 600;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(0, 0, 0, 0.18), 0 8px 20px rgba(0, 0, 0, 0.14);
+    transition: background 160ms ease, transform 200ms var(--ease), box-shadow 200ms var(--ease);
   }
-  button:hover { background: var(--green-press); }
-  button:active { transform: scale(0.98); }
+  button:hover { background: linear-gradient(180deg, #2c2c2e 0%, #000 100%); }
+  button:active { transform: scale(0.97); }
   button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
-  .error { margin: 0; color: #d70015; font-size: 14px; text-align: center; }
-  .foot { margin: 28px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  .error { margin: 2px 0 0; color: #d70015; font-size: 14px; text-align: center; }
+  .foot { margin: 24px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  @media (max-width: 440px) { main { padding: 34px 22px 26px; border-radius: 28px; } }
+  @media (prefers-reduced-transparency: reduce) { main { background: #fff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>

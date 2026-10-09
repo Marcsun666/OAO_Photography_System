@@ -113,6 +113,40 @@
     return PROXY + "/api/file/" + encodeURIComponent(token);
   }
 
+  /* v3：加载骨架 / 出错可重试。飞书接口一次要 3–7 秒，空白等待会让人以为坏了。 */
+  function skeleton(kind, n) {
+    var one = {
+      tile: '<div class="skel skel-tile" aria-hidden="true"><i></i><i></i><i></i></div>',
+      shot: '<div class="skel skel-shot" aria-hidden="true"></div>',
+      card: '<div class="skel skel-card" aria-hidden="true"><i></i><i></i></div>',
+    }[kind];
+    var out = "";
+    for (var i = 0; i < n; i++) out += one;
+    return '<div class="skel-group" role="status" aria-label="加载中">' + out + "</div>";
+  }
+
+  function showLoading() {
+    var map = { "#timeline-list": ["tile", 3], "#gallery-grid": ["shot", 6],
+      "#video-grid": ["card", 2], "#archive-grid": ["card", 3] };
+    Object.keys(map).forEach(function (sel) {
+      var box = el(sel);
+      if (box) box.innerHTML = skeleton(map[sel][0], map[sel][1]);
+    });
+    var rail = el("#stat-rail");
+    if (rail && rail.classList) rail.classList.add("is-loading");
+  }
+
+  function showLoadError(msg) {
+    var html = '<div class="empty-state is-error"><p>暂时连不上资料库：' + esc(msg) +
+      '</p><button class="button ghost" type="button" data-action="retry">重试</button></div>';
+    ["#timeline-list", "#gallery-grid", "#video-grid", "#archive-grid"].forEach(function (sel) {
+      var box = el(sel);
+      if (box) box.innerHTML = html;
+    });
+    var rail = el("#stat-rail");
+    if (rail && rail.classList) rail.classList.remove("is-loading");
+  }
+
   function emptyState(text) {
     return '<div class="empty-state">' + esc(text) + "</div>";
   }
@@ -253,8 +287,10 @@
   function updateMemberUI() {
     var toggle = el("#member-toggle");
     var entry = el("#upload-entry");
-    if (toggle) toggle.textContent = state.token ? "退出 · 已登录" : "成员登录";
+    if (toggle) toggle.textContent = state.token ? "退出登录" : "成员登录";
     if (entry) entry.hidden = !state.token;
+    // v3：成员工作区按登录态切换（锁定提示 / 快捷操作）
+    if (document.body && document.body.classList) document.body.classList.toggle("is-member", !!state.token);
   }
 
   function logout() {
@@ -285,9 +321,10 @@
             sessionStorage.setItem("oao_token", res.token);
             closeModal(modal);
             form.reset();
-            toast("登录成功，现在可以上传素材了");
+            toast("登录成功，成员工作区已解锁");
             updateMemberUI();
             loadMembers();
+            runPendingAction();
           } else {
             status.textContent = res.msg || "口令不正确";
           }
@@ -315,10 +352,19 @@
     });
   }
 
+  function firstLoad() {
+    if (!DEMO) showLoading();
+    loadData().then(renderAll).catch(function (err) {
+      showLoadError(err.message);
+      toast("后端连接失败：" + err.message, true);
+    });
+  }
+
   /* ---------------------------- 渲染 ---------------------------- */
   function renderHeroStats(acts) {
     var rail = el("#stat-rail");
     if (!rail) return;
+    if (rail.classList) rail.classList.remove("is-loading");
     var totalPhotos = acts.reduce(function (s, a) { return s + num(a.fields, F.activity.photoCount); }, 0);
     var totalVideos = acts.reduce(function (s, a) { return s + num(a.fields, F.activity.videoCount); }, 0);
     rail.innerHTML =
@@ -390,7 +436,7 @@
           (desc ? "<p>" + esc(desc) + "</p>" : "") +
           (status ? '<span class="tile-status">' + esc(status) + "</span>" : "") +
         "</div><span class=\"tile-frame\"></span></article>";
-    }).join("") || emptyState("还没有活动记录，登录后开始录入。");
+    }).join("") || emptyState("还没有活动记录。想让 OAO 来拍？点「申请拍摄」告诉我们。");
   }
 
   function renderLibrary(photos) {
@@ -429,7 +475,7 @@
       var cls = (cat === "stage" || cat === "collab" || cat === "landscape") ? "tall" : "wide";
       return '<button class="shot ' + cls + '" data-category="' + esc(cat) + '" data-full="' + fileUrl(token) + '">' +
         '<img src="' + fileUrl(token) + '" alt="' + esc(alt) + '" loading="lazy" decoding="async" /></button>';
-    }).join("") || emptyState("还没有可展示的照片。");
+    }).join("") || emptyState("还没有可展示的照片。成员登录后可以直接上传。");
     afterGalleryRender(grid);
   }
 
@@ -487,6 +533,58 @@
     }).join("");
   }
 
+  /* v3：上传弹窗可以直接带着模式打开（成员工作区的快捷入口） */
+  function applyMode(mode) {
+    var form = el("#upload-form");
+    ["link", "file", "social"].forEach(function (m) {
+      var panel = el(".mode-" + m);
+      if (panel) panel.hidden = m !== mode;
+    });
+    var radios = form && form.querySelectorAll ? form.querySelectorAll('input[name="mode"]') : [];
+    Array.prototype.forEach.call(radios, function (r) { r.checked = r.value === mode; });
+    var act = el(".field-activity");
+    if (act) act.hidden = mode === "social";
+    var actInput = form && form.querySelector ? form.querySelector('input[name="activity"]') : null;
+    if (actInput) actInput.required = mode !== "social";
+  }
+
+  function openUpload(mode) {
+    populateActivityDatalist();
+    applyMode(mode || "link");
+    var status = el("#upload-status");
+    if (status) status.textContent = "";
+    openModal(el("#upload-modal"));
+  }
+
+  var pendingAction = null;
+  function runPendingAction() {
+    var a = pendingAction;
+    pendingAction = null;
+    if (a) doAction(a);
+  }
+
+  function doAction(action) {
+    if (action === "retry") { firstLoad(); return; }
+    if (action === "login") { if (!state.token) openModal(el("#login-modal")); return; }
+    var needsMember = { "upload-file": "file", "upload-link": "link", "upload-social": "social" };
+    if (needsMember[action]) {
+      if (!state.token && !DEMO) { pendingAction = action; openModal(el("#login-modal")); return; }
+      openUpload(needsMember[action]);
+    }
+  }
+
+  function setupActions() {
+    if (!document.addEventListener) return;
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest ? e.target.closest("[data-action]") : null;
+      if (!t) return;
+      var action = t.getAttribute("data-action");
+      if (action === "roster") return; // 普通锚点
+      e.preventDefault();
+      doAction(action);
+    });
+  }
+
   function setupUploadUI() {
     var entry = el("#upload-entry");
     var modal = el("#upload-modal");
@@ -494,15 +592,12 @@
     var status = el("#upload-status");
 
     entry.addEventListener("click", function () {
-      populateActivityDatalist();
-      openModal(modal);
+      openUpload();
     });
 
     form.querySelectorAll('input[name="mode"]').forEach(function (r) {
       r.addEventListener("change", function () {
-        var isLink = (new FormData(form).get("mode")) === "link";
-        el(".mode-link").hidden = !isLink;
-        el(".mode-file").hidden = isLink;
+        applyMode((new FormData(form).get("mode")) || "link");
       });
     });
 
@@ -512,11 +607,21 @@
       var mode = data.get("mode");
       var activity = (data.get("activity") || "").toString().trim();
       var note = (data.get("note") || "").toString().trim();
-      if (!activity) { status.textContent = "请填写所属活动"; return; }
-      status.textContent = "提交中…";
-
       var p;
-      if (mode === "link") {
+      if (mode === "social") {
+        // v3：B站 / 小红书作品链接，写入「外链」表
+        var title = (data.get("title") || "").toString().trim();
+        var url = (data.get("url") || "").toString().trim();
+        if (!title || !url) { status.textContent = "请填写标题和作品链接"; return; }
+        status.textContent = "提交中…";
+        p = api("/api/links", { method: "POST", auth: true,
+          body: { platform: data.get("platform") || "B站", title: title, url: url, note: note } });
+      } else if (!activity) { status.textContent = "请填写所属活动"; return; }
+      else status.textContent = "提交中…";
+
+      if (p) {
+        /* 外链已在上面发出 */
+      } else if (mode === "link") {
         var link = (data.get("link") || "").toString().trim();
         var code = (data.get("code") || "").toString().trim();
         if (!link) { status.textContent = "请填写网盘分享链接"; return; }
@@ -539,6 +644,7 @@
       p.then(function () {
         status.textContent = "已入库 ✓";
         form.reset();
+        applyMode("link");
         toast(DEMO ? "演示模式：已模拟入库" : "素材已入库，稍后刷新可见");
         setTimeout(function () { closeModal(modal); }, 700);
         reloadData();
@@ -561,6 +667,8 @@
       if (!name) return;
       var date = (data.get("date") || "").toString().trim();
       var record = (data.get("record") || "").toString().trim();
+      var contact = (data.get("contact") || "").toString().trim();
+      if (contact) record += "\n联系人：" + contact;
       var c = data.get("creativity") || 0, a = data.get("activity") || 0, s = data.get("service") || 0;
       var desc = record + ((c || a || s) ? "\nCAS：C " + c + " / A " + a + " / S " + s : "");
 
@@ -578,7 +686,7 @@
       }).then(function () {
         status.textContent = DEMO
           ? "演示模式：已模拟提交，不会真正保存。"
-          : "已提交「" + name + "」并写入资料库。";
+          : "已收到「" + name + "」的拍摄申请，我们会尽快联系你。";
         form.reset();
         reloadData();
       }).catch(function (err) {
@@ -903,6 +1011,7 @@
 
     setupAuthUI();
     setupUploadUI();
+    setupActions();
     updateMemberUI();
 
     if (DEMO) {
@@ -910,9 +1019,7 @@
       toast("演示模式：展示内置示例数据");
     }
 
-    loadData().then(renderAll).catch(function (err) {
-      toast("后端连接失败，先展示离线内容：" + err.message, true);
-    });
+    firstLoad();
     loadMembers();
   }
 
