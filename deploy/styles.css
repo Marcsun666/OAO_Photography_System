@@ -2006,6 +2006,10 @@ input[type="file"]::file-selector-button {
   letter-spacing: 0;
 }
 .cas-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cas-grid.cas-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } /* v4.1 任务编辑器：只有 C / S */
+/* 弹窗里的通用 label/input 规则更具体，这里把 CAS 框恢复成和申请表一样（字母前缀 + 满宽） */
+.modal form .cas-grid label { display: block; }
+.modal form .cas-grid input { width: 100%; padding-left: 38px; }
 .cas-grid label {
   position: relative;
   display: block;
@@ -4567,6 +4571,13 @@ body:not(.is-admin) .nav-admin { display: none !important; }
 .ag-ev i { grid-row: 1 / 3; align-self: stretch; width: 4px; border-radius: 2px; background: var(--cc); }
 .ag-t { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ag-m { color: var(--v4-ink2); font-size: 12.5px; }
+/* v4.1 申请拍摄区：给社员的一行提示，指向拍摄日历 */
+.request-copy .request-member-hint { margin-top: 10px; font-size: 14px; }
+.request-member-hint a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+/* v4.1 CAS 时间：手机议程 / 当天列表里多一行（桌面格子只在悬停提示里） */
+.ag-ev i { grid-row: 1 / 4; }
+.ag-cas { grid-column: 2; color: var(--v4-ink2); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ag-cas b { margin-right: 6px; color: var(--ct); font-weight: 600; }
 .ag-exam {
   margin: 6px 0; padding: 10px 14px; border-radius: 14px; color: var(--v4-ink2); font-size: 13px;
   background: repeating-linear-gradient(135deg, rgba(142, 142, 147, 0.12) 0 6px, transparent 6px 12px), var(--v4-card2);

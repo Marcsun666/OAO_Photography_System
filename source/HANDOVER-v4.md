@@ -1,9 +1,9 @@
 # OAO Photography Club (OAO 摄影社) website: v4 handover
 
-> **v4.1 (preview only, 2026-10-09):** CAS 时间 on tasks + clearer 邀请拍摄 copy, on git branch `v4.1` and Pages branch `v41` (<https://v41.oao-photography.pages.dev>). Production is still v4. See **§18**.
-> **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09): LIVE in production** at <https://oao-photography.pages.dev> (Cloudflare deployment `522b752c`, git `main` / tag `v4`). The v4 preview remains at <https://v4.oao-photography.pages.dev> (Pages branch `v4`). **Rollback:** v3 deployment `0d0d5be2` (git tag `v3`); see §17.8. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
+> **v4.1 LIVE in production (2026-10-09):** CAS 时间 on tasks + clearer 邀请拍摄 copy. Cloudflare deployment **`caccbb28-9462-42eb-8339-7f0e1f58dee5`**, git `main` / tag `v4.1`. **Rollback:** v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1). The v4.1 preview stays at <https://v41.oao-photography.pages.dev>. See **§18**. The v4 notes below describe the base that v4.1 extends.
+> **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09):** v4 went live as Cloudflare deployment `522b752c` (git tag `v4`) and was superseded the same day by **v4.1** (deployment `caccbb28`, git `main` / tag `v4.1`). The v4 preview remains at <https://v4.oao-photography.pages.dev> (Pages branch `v4`). **Rollback:** v3 deployment `0d0d5be2` (git tag `v3`); see §17.8. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
 > **Live URL (v4 since 2026-10-09):** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
-> **Source:** the private GitHub repo `Marcsun666/OAO_Photography_System`: `main` and tag `v4` = this version (live); tag `v3` = previous production (rollback); tag/branch `v2` = older (see §11).
+> **Source:** the GitHub repo `Marcsun666/OAO_Photography_System` (public): `main` and tag `v4.1` = live; tag `v4` = v4 (rollback target `522b752c`); tag `v3` = previous production (rollback); tag/branch `v2` = older (see §11).
 > **Language:** this doc is in English. Chinese UI text and Feishu table/field names are quoted exactly. Never translate them in code.
 
 ---
@@ -753,7 +753,7 @@ v2 and v3 use the same API, secrets and Feishu data, so rolling back in either d
 
 ---
 
-## 17. v4 (LIVE in production since 2026-10-09, deployment `522b752c`; preview at https://v4.oao-photography.pages.dev)
+## 17. v4 (was production 2026-10-09, deployment `522b752c`, now the v4.1 rollback target; preview at https://v4.oao-photography.pages.dev)
 
 ### 17.1 What the owner asked for and what was built
 
@@ -858,9 +858,9 @@ Then run the §14 checks plus: admin passcode → 管理 appears; `/api/admin/ov
 
 ---
 
-## 18. v4.1 (PREVIEW ONLY, 2026-10-09): CAS 时间 on tasks + 邀请拍摄 copy
+## 18. v4.1 (LIVE in production since 2026-10-09, deployment `caccbb28`): CAS 时间 on tasks + 邀请拍摄 copy
 
-**Status:** deployed to the Pages branch `v41` → <https://v41.oao-photography.pages.dev> (same site password). **Not** in production; production is still v4 (`522b752c`). Git: branch `v4.1` (not merged into `main`). Promote only after the owner approves (§18.5).
+**Status: LIVE in production** since 2026-10-09 (owner approved): Cloudflare deployment **`caccbb28-9462-42eb-8339-7f0e1f58dee5`** (branch `main`, source commit `4beba1d`) at <https://oao-photography.pages.dev>. Git: `main` fast-forwarded to `v4.1`, tag **`v4.1`**, `deploy/` = the v4.1 build. The preview stays at <https://v41.oao-photography.pages.dev>. **Rollback:** v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1, §18.6).
 
 ### 18.1 Backup taken before v4.1 (keep it)
 
@@ -916,6 +916,14 @@ rm -rf .wrangler && npx wrangler@4 pages deploy . --project-name oao-photography
 ```
 
 No production secret changes are needed. Rollback: §18.1.
+
+### 18.6 Promotion record (2026-10-09)
+
+- Branch `v4.1` at `4beba1d`: all 6 test files passed; `tools/build-deploy.sh` output identical to `/workspace/oao-deploy-v41` (apart from wrangler's `.wrangler/` cache).
+- Production secrets checked (names only): all 19 present (incl. `TABLE_EVENTS`, `ADMIN_PASSCODE`, `ADMIN_TOKEN`). v4.1 reads no new env vars, so nothing was added.
+- Deployed with `--branch main` → deployment **`caccbb28-9462-42eb-8339-7f0e1f58dee5`**.
+- Live checks on <https://oao-photography.pages.dev> (18/18 passed): site lock 401, wrong password not accepted, login 303; health `connected`; `/cloud-function/index.js` 404; `/api/events` = 29 tasks, all `casC=1` / `casS=1` (numbers), no 学号; member passcode → `member`, admin passcode → `admin`, wrong code 401; `/api/admin/overview` 401 without a token, 403 with the member token, 200 with the admin token (29 events, CAS 1/1); homepage contains `邀请 OAO 来拍你的活动` and `拍摄日历` and no longer contains `申请 OAO 拍摄活动`. The served `index.html`, `app.js`, `events.js`, `styles.css`, `script.js` and `config.js` are byte-identical to the build.
+- Rollback (if ever needed): Cloudflare dashboard → Deployments → `522b752c` → Rollback, or `npx wrangler@4 pages deploy /workspace/backups/v4.0-2026-10-09/deploy --project-name oao-photography --branch main --commit-dirty=true`; then point the git docs back at tag `v4`.
 
 Note: GitHub reports the repo `Marcsun666/OAO_Photography_System` as **public** (older sections of this doc say private). It contains no secrets, but it does document the Base app_token and table ids. Never commit `/workspace/backups/`.
 

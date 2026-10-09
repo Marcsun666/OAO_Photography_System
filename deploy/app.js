@@ -452,7 +452,7 @@
           (desc ? "<p>" + esc(desc) + "</p>" : "") +
           (status ? '<span class="tile-status">' + esc(status) + "</span>" : "") +
         "</div><span class=\"tile-frame\"></span></article>";
-    }).join("") || emptyState("还没有活动记录。想让 OAO 来拍？点「申请拍摄」告诉我们。");
+    }).join("") || emptyState("还没有活动记录。想请 OAO 来拍？点「邀请拍摄」告诉我们。");
   }
 
   function renderLibrary(photos) {
