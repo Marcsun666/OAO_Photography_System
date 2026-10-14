@@ -103,6 +103,7 @@ const F = {
     code: "提取码",
     category: "分类",
     note: "说明",
+    sourceApp: "来源申请ID", // v4.1.1：由「交付」自动生成的素材卡记住对应的报名记录 id（重复交付 = 更新，不重复建）
   },
   link: {
     platform: "平台",
@@ -284,6 +285,10 @@ async function updateRecord(table, recordId, fields) {
     body: JSON.stringify({ fields }),
   });
   return json.data.record;
+}
+
+async function deleteRecord(table, recordId) {
+  await feishu(`${bitableRecordsUrl(table)}/${recordId}`, { method: "DELETE" });
 }
 
 /* ------------------------------------------------------------------ *
@@ -1256,6 +1261,7 @@ async function routeV4(req) {
       if (["已报名", "已确认"].indexOf(a.status) < 0) return respond(409, { ok: false, msg: `当前状态「${a.status}」不能取消` });
       if (ev && ev.ended) return respond(409, { ok: false, msg: "任务已经结束，不能取消报名" });
       const upd = await updateRecord(ENV.tableApplications, a.id, { [F.app.status]: "已取消" });
+      await unsyncLibrary(a.id);
       return respond(200, { ok: true, item: appView(recordToItem(upd)) });
     }
 
@@ -1274,7 +1280,9 @@ async function routeV4(req) {
     };
     if (caption) fields[F.app.caption] = caption;
     const upd = await updateRecord(ENV.tableApplications, a.id, fields);
-    return respond(200, { ok: true, item: appView(recordToItem(upd)) });
+    // v4.1.1：交付后自动同步到「活动素材库」（尽力而为，失败不影响交付本身）
+    const library = await syncLibrary({ ...a, link, code, desc }, ev, true);
+    return respond(200, { ok: true, item: appView(recordToItem(upd)), library });
   }
   return respond(404, { ok: false, msg: `未知接口 ${method} ${path}` });
 }
@@ -1346,7 +1354,18 @@ async function routeAdmin(req) {
       return respond(409, { ok: false, msg: "还没交付，不能验收" });
     }
     const rec = await updateRecord(ENV.tableApplications, m[1], fields);
-    return respond(200, { ok: true, item: appView(recordToItem(rec)) });
+    // v4.1.1：退回 / 取消 → 素材卡下架；恢复为 已交付 / 已验收 → 素材卡补回（不再调 AI，用已有文案或原描述）
+    const st = fields[F.app.status];
+    let library;
+    if (st === "已退回" || st === "已取消") library = { removed: await unsyncLibrary(m[1]) };
+    else if (st === "已交付" || st === "已验收") {
+      const av = appView({ ...cur, fields: { ...(cur.fields || {}), ...fields } });
+      if (av.link) {
+        const evRec = await getRecord(ENV.tableEvents, av.eventId);
+        library = await syncLibrary(av, evRec ? eventView(evRec) : null, false);
+      }
+    }
+    return respond(200, { ok: true, item: appView(recordToItem(rec)), library });
   }
   // 拍摄申请 → 任务（只新建任务，不改申请本身；用「来源申请」记住来源，避免重复转换）
   m = path.match(/^\/api\/admin\/requests\/(rec[A-Za-z0-9]+)\/convert$/);
@@ -1471,6 +1490,7 @@ const AI_FEATURES = {
   weekly:   { label: "AI 周报",       perDay: 10, maxTokens: 600 },
   draft:    { label: "AI 整理申请",   perDay: 30, maxTokens: 300 },
   caption:  { label: "AI 润色文案",   perDay: 60, maxTokens: 200 },
+  libcap:   { label: "素材库文案",     perDay: 80, maxTokens: 120, noCooldown: true }, // v4.1.1：交付 → 素材卡说明
 };
 const aiCooldown = {};
 
@@ -1534,7 +1554,7 @@ async function aiCall(feature, prompt, maxTokens) {
   const row = rows.find((r) => fstr(r.fields, F.usage.feature) === feature);
   const dayCalls = row && fstr(row.fields, F.usage.day) === today ? fnum(row.fields, F.usage.dayCalls) : 0;
   if (dayCalls >= spec.perDay) throw aiError("AI_RATE", `今天「${spec.label}」已经用了 ${dayCalls} 次（每日上限 ${spec.perDay}），明天再试吧。`);
-  if (aiCooldown[feature] && Date.now() - aiCooldown[feature] < 4000) throw aiError("AI_RATE", "点得太快啦，请几秒后再试。");
+  if (!spec.noCooldown && aiCooldown[feature] && Date.now() - aiCooldown[feature] < 4000) throw aiError("AI_RATE", "点得太快啦，请几秒后再试。");
   aiCooldown[feature] = Date.now();
 
   let out, usage;
@@ -1603,6 +1623,77 @@ async function aiCaption(req) {
     const tags = (Array.isArray(j.tags) ? j.tags : []).map((t) => clip(t, 20)).filter(Boolean).slice(0, 3);
     return respond(200, { ok: true, caption: clip(j.caption, 200), tags, ...aiMeta(r) });
   } catch (e) { return aiFail(e); }
+}
+
+/* ================================================================== *
+ * v4.1.1：交付 → 活动素材库
+ * 成员交付（或重新交付）后，在「照片素材」里按「来源申请ID」upsert 一张素材卡：
+ *   活动 = 「任务名称 M.DD」，网盘链接 / 提取码 = 交付内容，分类 = 素材，说明 = AI 整理的一两句（失败用原描述）。
+ * 素材卡上不写成员姓名 / 学号。退回 / 取消 → 删除这张卡。
+ * ================================================================== */
+function libraryTitle(eventTitle, date) {
+  const m = String(date || "").match(/^\d{4}-(\d{2})-(\d{2})$/);
+  const t = String(eventTitle || "").trim() || "拍摄任务";
+  return m ? `${t} ${Number(m[1])}.${m[2]}` : t;
+}
+function cleanCaption(s) {
+  return String(s || "").replace(/^["'“”「」\s]+|["'“”「」\s]+$/g, "").replace(/\s*\n\s*/g, " ").trim();
+}
+async function libraryCaption(title, desc, useAi) {
+  const raw = clip(cleanCaption(desc), 120);
+  if (!useAi) return { text: raw, ai: false };
+  const prompt = [
+    "你是学生摄影社的资料管理员。把成员交付素材时写的描述整理成素材库卡片上的一句说明。",
+    `活动：${title}`,
+    `成员描述：${clip(desc, 400)}`,
+    "要求：中文，一到两行、不超过 30 字，客观说明这份素材包含什么（如「包含中国文化周第一天的所有活动」）；",
+    "不要人名、学号、联系方式，不要话题标签、表情或引号，不编造描述里没有的内容。",
+    '只输出 JSON：{"caption":"…"}',
+  ].join("\n");
+  try {
+    const r = await aiCall("libcap", prompt, 120);
+    const c = clip(cleanCaption(parseJsonObject(r.text).caption), 60);
+    return c ? { text: c, ai: true } : { text: raw, ai: false };
+  } catch (e) {
+    return { text: raw, ai: false, aiError: e.code || "AI_FAILED" };
+  }
+}
+async function findLibraryRows(appId) {
+  if (!ENV.tablePhotos || !appId) return [];
+  const json = await feishu(`${bitableRecordsUrl(ENV.tablePhotos)}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ filter: { conjunction: "and", conditions: [{ field_name: F.photo.sourceApp, operator: "is", value: [appId] }] } }),
+  });
+  return (json.data.items || []).map(recordToItem);
+}
+async function syncLibrary(a, ev, useAi) {
+  if (!ENV.tablePhotos) return { ok: false, msg: "TABLE_PHOTOS 未配置" };
+  try {
+    const title = libraryTitle((ev && ev.title) || a.eventTitle, ev && ev.date);
+    const cap = await libraryCaption(title, a.desc || a.caption, useAi);
+    const fields = {
+      [F.photo.activity]: title, [F.photo.link]: a.link, [F.photo.code]: a.code,
+      [F.photo.category]: "素材", [F.photo.note]: cap.text, [F.photo.sourceApp]: a.id,
+    };
+    const rows = await findLibraryRows(a.id);
+    const rec = rows.length ? await updateRecord(ENV.tablePhotos, rows[0].id, fields) : await createRecord(ENV.tablePhotos, fields);
+    for (const extra of rows.slice(1)) await deleteRecord(ENV.tablePhotos, extra.id).catch(() => {});
+    return { ok: true, updated: rows.length > 0, id: (rec && rec.record_id) || (rows[0] && rows[0].id), title, caption: cap.text, ai: cap.ai };
+  } catch (e) {
+    console.error("[oao-proxy] 素材库同步失败:", e && e.message);
+    return { ok: false, msg: "素材库同步失败" };
+  }
+}
+async function unsyncLibrary(appId) {
+  try {
+    const rows = await findLibraryRows(appId);
+    for (const r of rows) await deleteRecord(ENV.tablePhotos, r.id);
+    return rows.length;
+  } catch (e) {
+    console.error("[oao-proxy] 素材库下架失败:", e && e.message);
+    return 0;
+  }
 }
 
 /* AI 2：给某个任务推荐人选（管理员） */

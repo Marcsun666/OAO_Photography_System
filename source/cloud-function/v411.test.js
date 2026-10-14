@@ -1,6 +1,6 @@
 /**
- * v4.2 离线测试：交付 → 活动素材库（照片素材）自动同步
- * 内存版飞书 + 假 DeepSeek。运行：node cloud-function/v42.test.js
+ * v4.1.1 离线测试：交付 → 活动素材库（照片素材）自动同步
+ * 内存版飞书 + 假 DeepSeek。运行：node cloud-function/v411.test.js
  */
 "use strict";
 const assert = require("assert");
@@ -105,5 +105,5 @@ const call = (method, path, body, token) => api.handle({
   await call("PUT", "/api/admin/applications/" + app.record_id, { status: "已退回" }, "admin-token");
   assert.strictEqual(db.tbl_photo.length, 1);
 
-  console.log("✅ v4.2 交付→素材库测试通过");
-})().catch((e) => { console.error("❌ v4.2 测试失败:", e); process.exit(1); });
+  console.log("✅ v4.1.1 交付→素材库测试通过");
+})().catch((e) => { console.error("❌ v4.1.1 测试失败:", e); process.exit(1); });

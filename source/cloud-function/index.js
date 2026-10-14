@@ -103,7 +103,7 @@ const F = {
     code: "提取码",
     category: "分类",
     note: "说明",
-    sourceApp: "来源申请ID", // v4.2：由「交付」自动生成的素材卡记住对应的报名记录 id（重复交付 = 更新，不重复建）
+    sourceApp: "来源申请ID", // v4.1.1：由「交付」自动生成的素材卡记住对应的报名记录 id（重复交付 = 更新，不重复建）
   },
   link: {
     platform: "平台",
@@ -1280,7 +1280,7 @@ async function routeV4(req) {
     };
     if (caption) fields[F.app.caption] = caption;
     const upd = await updateRecord(ENV.tableApplications, a.id, fields);
-    // v4.2：交付后自动同步到「活动素材库」（尽力而为，失败不影响交付本身）
+    // v4.1.1：交付后自动同步到「活动素材库」（尽力而为，失败不影响交付本身）
     const library = await syncLibrary({ ...a, link, code, desc }, ev, true);
     return respond(200, { ok: true, item: appView(recordToItem(upd)), library });
   }
@@ -1354,7 +1354,7 @@ async function routeAdmin(req) {
       return respond(409, { ok: false, msg: "还没交付，不能验收" });
     }
     const rec = await updateRecord(ENV.tableApplications, m[1], fields);
-    // v4.2：退回 / 取消 → 素材卡下架；恢复为 已交付 / 已验收 → 素材卡补回（不再调 AI，用已有文案或原描述）
+    // v4.1.1：退回 / 取消 → 素材卡下架；恢复为 已交付 / 已验收 → 素材卡补回（不再调 AI，用已有文案或原描述）
     const st = fields[F.app.status];
     let library;
     if (st === "已退回" || st === "已取消") library = { removed: await unsyncLibrary(m[1]) };
@@ -1490,7 +1490,7 @@ const AI_FEATURES = {
   weekly:   { label: "AI 周报",       perDay: 10, maxTokens: 600 },
   draft:    { label: "AI 整理申请",   perDay: 30, maxTokens: 300 },
   caption:  { label: "AI 润色文案",   perDay: 60, maxTokens: 200 },
-  libcap:   { label: "素材库文案",     perDay: 80, maxTokens: 120, noCooldown: true }, // v4.2：交付 → 素材卡说明
+  libcap:   { label: "素材库文案",     perDay: 80, maxTokens: 120, noCooldown: true }, // v4.1.1：交付 → 素材卡说明
 };
 const aiCooldown = {};
 
@@ -1626,7 +1626,7 @@ async function aiCaption(req) {
 }
 
 /* ================================================================== *
- * v4.2：交付 → 活动素材库
+ * v4.1.1：交付 → 活动素材库
  * 成员交付（或重新交付）后，在「照片素材」里按「来源申请ID」upsert 一张素材卡：
  *   活动 = 「任务名称 M.DD」，网盘链接 / 提取码 = 交付内容，分类 = 素材，说明 = AI 整理的一两句（失败用原描述）。
  * 素材卡上不写成员姓名 / 学号。退回 / 取消 → 删除这张卡。

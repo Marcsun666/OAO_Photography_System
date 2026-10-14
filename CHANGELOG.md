@@ -2,7 +2,9 @@
 
 All dates are 2026 (Beijing time). The live site is <https://oao-photography.pages.dev> (password-locked). Details are in the [handover doc](OAO-Photography-v4-HANDOVER.md).
 
-## v4.2 — 2026-10-14 (preview only: <https://v42.oao-photography.pages.dev>)
+## v4.1.1 — 2026-10-14 (LIVE)
+
+Cloudflare deployment `12d236b9`, git tag `v4.1.1`. Rollback target: `7d104a88` (v4.1 polish). Handover §19. (Previewed as "v4.2" at <https://v42.oao-photography.pages.dev>.)
 
 **Added**
 - **Delivery → 活动素材库.** When a member delivers (or re-delivers) a Baidu link + 提取码 + 描述 for a task, the server upserts a card in 照片素材: 活动 = `<任务名称> <M.DD>` (e.g. `中国文化周Day1 10.13`), 网盘链接, 提取码, 分类 = `素材`, 说明 = a short caption. It shows in #library like the existing cards (OAO gradient cover, 打开网盘›, 提取码 · 复制).
@@ -12,7 +14,7 @@ All dates are 2026 (Beijing time). The live site is <https://oao-photography.pag
 - No names or 学号 on the card or sent to the model.
 - Library shows newest first; after delivering, the library refreshes and the toast says it was synced.
 
-**Tests:** new `cloud-function/v42.test.js`; `v4.test.js` adjusted for the extra libcap usage row. All 7 test files pass (run `cloud-function/test.js` without `LLM_API_KEY` exported in the shell, it reads `process.env`).
+**Tests:** new `cloud-function/v411.test.js`; `v4.test.js` adjusted for the extra libcap usage row. All 7 test files pass (run `cloud-function/test.js` without `LLM_API_KEY` exported in the shell, it reads `process.env`).
 
 ## v4.1 polish — 2026-10-09
 

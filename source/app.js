@@ -472,7 +472,7 @@
   function renderLibrary(photos) {
     var grid = el("#archive-grid");
     if (!grid) return;
-    // v4.2：最新的在前（交付自动生成的素材卡也会出现在最前面）
+    // v4.1.1：最新的在前（交付自动生成的素材卡也会出现在最前面）
     grid.innerHTML = photos.slice().reverse().slice(0, 12).map(function (p) {
       var act = str(p.fields, F.photo.activity) || "未分类";
       var tokens = fileTokens(p.fields, F.photo.file);
@@ -1099,7 +1099,7 @@
     members: function () { return state.members; },
     /* v4.1 polish：events.js 加载日历后把「待开拍任务数」交给首屏统计 */
     setUpcoming: function (n) { state.upcoming = n; renderHeroStats(); },
-    /* v4.2：交付后素材库会多一张卡，重新拉一次数据 */
+    /* v4.1.1：交付后素材库会多一张卡，重新拉一次数据 */
     reload: function () { reloadData(); },
     /* 需要成员身份：已登录直接执行；否则弹登录框，登录成功后接着执行 */
     requireMember: function (fn) {

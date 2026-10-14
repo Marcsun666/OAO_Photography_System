@@ -1,7 +1,7 @@
 # OAO Photography Club (OAO 摄影社) website: v4 handover
 
-> **v4.2 (2026-10-14) is on the PREVIEW only:** <https://v42.oao-photography.pages.dev> (Pages branch `v42`, deployment `49667edf`). Delivery → 活动素材库 auto-sync. Production is still v4.1. See **§19**.
-> **v4.1 (polish) LIVE in production (2026-10-09):** CAS 时间 on tasks, 邀请拍摄 kept off the public site, delivery opens on 已结束, admin-only AI 分组 and a UI consistency pass. Cloudflare deployment **`7d104a88-1116-4c69-a858-375ded02409d`**, git `main` / tag `v4.1` (moved to the polish commit). **Rollback:** the pre-polish v4.1 deployment `caccbb28-9462-42eb-8339-7f0e1f58dee5` (git tag `v4.1-backup`, files in `/workspace/backups/v4.1-2026-10-09/deploy`), see §18.7. Older rollback: v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1). The v4.1 preview stays at <https://v41.oao-photography.pages.dev>. See **§18**. The v4 notes below describe the base that v4.1 extends.
+> **v4.1.1 LIVE in production (2026-10-14):** delivery → 活动素材库 auto-sync. Cloudflare deployment **`12d236b9-af28-415f-a474-f592a6bf991a`** (`https://12d236b9.oao-photography.pages.dev`), git `main` / tag `v4.1.1`. **Rollback:** v4.1 polish deployment `7d104a88-1116-4c69-a858-375ded02409d` (backup `/workspace/backups/v4.1.1-2026-10-14/`). See **§19**. The v4.1 notes below still apply.
+> **v4.1 (polish), production 2026-10-09 → 2026-10-14:** CAS 时间 on tasks, 邀请拍摄 kept off the public site, delivery opens on 已结束, admin-only AI 分组 and a UI consistency pass. Cloudflare deployment **`7d104a88-1116-4c69-a858-375ded02409d`**, git `main` / tag `v4.1` (moved to the polish commit). **Rollback:** the pre-polish v4.1 deployment `caccbb28-9462-42eb-8339-7f0e1f58dee5` (git tag `v4.1-backup`, files in `/workspace/backups/v4.1-2026-10-09/deploy`), see §18.7. Older rollback: v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1). The v4.1 preview stays at <https://v41.oao-photography.pages.dev>. See **§18**. The v4 notes below describe the base that v4.1 extends.
 > **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09):** v4 went live as Cloudflare deployment `522b752c` (git tag `v4`) and was superseded the same day by **v4.1** (deployment `caccbb28`, git `main` / tag `v4.1`). The v4 preview remains at <https://v4.oao-photography.pages.dev> (Pages branch `v4`). **Rollback:** v3 deployment `0d0d5be2` (git tag `v3`); see §17.8. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
 > **Live URL (v4 since 2026-10-09):** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
 > **Source:** the GitHub repo `Marcsun666/OAO_Photography_System` (public): `main` and tag `v4.1` = live (v4.1 polish); tag `v4.1-backup` = v4.1 before the polish; tag `v4` = v4 (rollback target `522b752c`); tag `v3` = previous production (rollback); tag/branch `v2` = older (see §11).
@@ -1041,9 +1041,11 @@ Still called **v4.1**. This is a refinement pass on the same design language (Ap
 
 ---
 
-## 19. v4.2 (PREVIEW, 2026-10-14): deliveries appear in 活动素材库
+## 19. v4.1.1 (LIVE, 2026-10-14): deliveries appear in 活动素材库
 
-**Status:** deployed to the preview branch `v42` only → <https://v42.oao-photography.pages.dev> (deployment `49667edf`). **Not promoted to production.** Git branch `v4.2`.
+**Status:** LIVE. Production deployment **`12d236b9`** (branch `main`), git branch `v4.1.1` merged into `main`, tag **`v4.1.1`**, `deploy/` = this build. Previewed first under the working name "v4.2" at <https://v42.oao-photography.pages.dev> (Pages branch `v42`, deployment `49667edf`).
+**Rollback:** Cloudflare → Deployments → `7d104a88-1116-4c69-a858-375ded02409d` → Rollback, or `cd /workspace/backups/v4.1.1-2026-10-14/deploy && npx wrangler@4 pages deploy . --project-name oao-photography --branch main --commit-dirty=true`. Backup (chmod 700, never commit): `/workspace/backups/v4.1.1-2026-10-14/` = `deploy/` (v4.1 build), `source-tree/` (git archive of old main), `feishu/*.json` (8 tables: 3/4/0/24/10/29/40/6 records, contains personal data), `ROLLBACK.md`.
+**Deploy gotcha (hit during this release):** run `wrangler pages deploy .` from **inside** the deploy folder. Running `wrangler pages deploy /path/to/folder` from another directory uploads the static files but **not** `functions/` (wrangler looks for `functions/` in the cwd), so the password lock and API disappear. That happened once (deployment `fc67b3dd`, live ~2 min, static files only, no data/API); it was immediately replaced by `12d236b9`.
 
 ### 19.1 What it does
 - `POST /api/applications/:id/deliver` (deliver and re-deliver), after saving the delivery, calls `syncLibrary()`:
@@ -1068,12 +1070,15 @@ Measured on the preview: one call ≈ ¥0.001. Same monthly guard (stop at ¥18,
 Preview env already had all 19 secrets. On 2026-10-14 `SITE_PASSWORD`, `MEMBER_PASSCODE`, `ADMIN_PASSCODE`, `FEISHU_APP_SECRET`, `LLM_API_KEY` were re-put from the owner's values (piped) and `ALLOWED_ORIGIN=https://v42.oao-photography.pages.dev`. Preview `MEMBER_TOKEN`/`ADMIN_TOKEN` unchanged (still differ from production).
 
 ### 19.5 Checks
-- 7 test files pass (`cloud-function/test.js`, `v4.test.js`, `v42.test.js`, `frontend.test.js`, `integration.test.js`, `design.test.js`, `events.test.js`). Note: `cloud-function/test.js` reads `process.env`, so unset `LLM_API_KEY` in your shell before running it.
+- 7 test files pass (`cloud-function/test.js`, `v4.test.js`, `v411.test.js`, `frontend.test.js`, `integration.test.js`, `design.test.js`, `events.test.js`). Note: `cloud-function/test.js` reads `process.env`, so unset `LLM_API_KEY` in your shell before running it.
 - Live on v42: a 【测试】 task (已结束, 2026-10-13) + admin-assigned application (TEST9999) → deliver 200, card `【测试】中国文化周Day1 10.13` with AI caption; re-deliver updated the same card (1 row); no name/学号 in `/api/photos`; 退回 → card removed. All test records deleted via the Feishu API (拍摄任务 29 / 报名与交付 40 / 照片素材 4, same as before). One libcap usage row remains in AI用量 (real spend record).
 - Screenshots: `/workspace/v42-shots/library-card-{1280,390}.png`, `library-section-{1280,390}.png` (not in git).
 
-### 19.6 Promote (only after owner approval)
+### 19.6 Promote / redeploy
 ```bash
-cd /workspace/oao-deploy-v42 && rm -rf .wrangler && npx wrangler@4 pages deploy . --project-name oao-photography --branch main --commit-dirty=true
+cd /workspace/oao-deploy-v411 && rm -rf .wrangler && npx wrangler@4 pages deploy . --project-name oao-photography --branch main --commit-dirty=true
 ```
-No production secret changes needed. Rollback: production deployment `7d104a88` (v4.1 polish). Existing deliveries made before v4.2 are not back-filled; re-deliver or add them by hand.
+No production secret changes needed. Rollback: production deployment `7d104a88` (v4.1 polish). Existing deliveries made before v4.1.1 are not back-filled; re-deliver or add them by hand.
+
+### 19.7 Production checks (2026-10-14, deployment `12d236b9`)
+Lock 401 → login 303 → health `connected`; `/cloud-function/index.js` 404; `/api/photos` ok (4 rows); `/api/events` 29 tasks, no 学号; admin/member passcodes → roles admin/member; `/api/admin/overview` 401 without token; served `/`, `app.js`, `events.js`, `styles.css` byte-identical to the build; library renders in Chrome at 1280/390 with no page errors (`/workspace/v411-shots/`). Feishu leftover check before release: 0 【测试】/TEST9999/TEST9998 records in 活动记录 / 照片素材 / 报名与交付 / 拍摄任务.

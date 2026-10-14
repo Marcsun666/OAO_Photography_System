@@ -24,7 +24,7 @@
     },
     photo: {
       activity: "活动", file: "文件", link: "网盘链接", code: "提取码",
-      category: "分类", note: "说明",
+      category: "分类", note: "说明", sourceApp: "来源申请ID",
     },
     link: { platform: "平台", title: "标题", url: "链接", note: "备注" },
     group: {
@@ -472,7 +472,8 @@
   function renderLibrary(photos) {
     var grid = el("#archive-grid");
     if (!grid) return;
-    grid.innerHTML = photos.slice(0, 12).map(function (p) {
+    // v4.1.1：最新的在前（交付自动生成的素材卡也会出现在最前面）
+    grid.innerHTML = photos.slice().reverse().slice(0, 12).map(function (p) {
       var act = str(p.fields, F.photo.activity) || "未分类";
       var tokens = fileTokens(p.fields, F.photo.file);
       var link = str(p.fields, F.photo.link);
@@ -1098,6 +1099,8 @@
     members: function () { return state.members; },
     /* v4.1 polish：events.js 加载日历后把「待开拍任务数」交给首屏统计 */
     setUpcoming: function (n) { state.upcoming = n; renderHeroStats(); },
+    /* v4.1.1：交付后素材库会多一张卡，重新拉一次数据 */
+    reload: function () { reloadData(); },
     /* 需要成员身份：已登录直接执行；否则弹登录框，登录成功后接着执行 */
     requireMember: function (fn) {
       if (state.token || DEMO) { fn(); return; }
