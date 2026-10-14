@@ -14,6 +14,8 @@ Cloudflare deployment `12d236b9`, git tag `v4.1.1`. Rollback target: `7d104a88` 
 - No names or 学号 on the card or sent to the model.
 - Library shows newest first; after delivering, the library refreshes and the toast says it was synced.
 
+- **Hero photo (2026-10-14):** the front-page group photo (`figure.hero-media`, its preload and the legacy CSS background) now uses the new club photo `assets/events/hero-group-2026.webp` (1600×1066 WebP, q82, 129 KB). The old `stage-group-photo.webp` stays in assets. og:image (recruitment banner) unchanged; the hero is still treated as a dark photo for `.on-dark`.
+
 **Tests:** new `cloud-function/v411.test.js`; `v4.test.js` adjusted for the extra libcap usage row. All 7 test files pass (run `cloud-function/test.js` without `LLM_API_KEY` exported in the shell, it reads `process.env`).
 
 ## v4.1 polish — 2026-10-09
