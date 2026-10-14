@@ -395,9 +395,10 @@
     if (!desc) { st.textContent = "写一句素材描述"; f.desc.focus(); return; }
     st.textContent = "提交中…";
     O.api("/api/applications/" + delivering.id + "/deliver", { method: "POST", auth: true,
-      body: { studentId: S.me.sid, link: link, code: code, desc: desc, caption: f.caption.value.trim() } }).then(function () {
+      body: { studentId: S.me.sid, link: link, code: code, desc: desc, caption: f.caption.value.trim() } }).then(function (r) {
       st.textContent = "已交付 ✓";
-      O.toast("素材已交付，等管理员验收");
+      O.toast(r && r.library && r.library.ok ? "素材已交付，并已同步到活动素材库" : "素材已交付，等管理员验收");
+      if (r && r.library && r.library.ok && O.reload) O.reload();
       setTimeout(function () { O.closeModal($("#deliver-modal")); }, 700);
       loadMine(); loadEvents();
     }).catch(function (e) { st.textContent = "提交失败：" + e.message; });

@@ -308,6 +308,9 @@ const call = (method, path, body, token, query) => api.handle({
   }
 
   /* 8) AI：成员可润色；记账；预算/次数守卫 */
+  // v4.2：前面的交付会顺带调一次「素材库文案」(libcap) 并记账；这里从空账本开始，只看 caption
+  assert.ok(db.tbl_ai.every((x) => x.fields.功能 === "libcap"), "此前只应有 libcap 的用量");
+  db.tbl_ai.length = 0;
   r = await call("POST", "/api/ai/caption", { desc: "冲刺瞬间，阳光很好" });
   assert.strictEqual(r.status, 401);
   r = await call("POST", "/api/ai/caption", { desc: "冲刺瞬间，阳光很好", eventTitle: "运动会" }, "member-token");

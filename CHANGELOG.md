@@ -2,6 +2,18 @@
 
 All dates are 2026 (Beijing time). The live site is <https://oao-photography.pages.dev> (password-locked). Details are in the [handover doc](OAO-Photography-v4-HANDOVER.md).
 
+## v4.2 — 2026-10-14 (preview only: <https://v42.oao-photography.pages.dev>)
+
+**Added**
+- **Delivery → 活动素材库.** When a member delivers (or re-delivers) a Baidu link + 提取码 + 描述 for a task, the server upserts a card in 照片素材: 活动 = `<任务名称> <M.DD>` (e.g. `中国文化周Day1 10.13`), 网盘链接, 提取码, 分类 = `素材`, 说明 = a short caption. It shows in #library like the existing cards (OAO gradient cover, 打开网盘›, 提取码 · 复制).
+- **AI caption** (new feature key `libcap`, max_tokens 120, 80/day, no cooldown, inside the existing ¥18/¥20 budget guard) rewrites the description into one or two short lines. If AI is refused or fails, the raw description is used.
+- New Feishu field 照片素材.`来源申请ID` (text) + 分类 option `素材` (additive, applied with `setup_tables.py`). Re-delivery updates the same card.
+- Admin 退回 / 取消 (and member cancel) remove the card; restoring to 已交付 / 已验收 puts it back (no AI call).
+- No names or 学号 on the card or sent to the model.
+- Library shows newest first; after delivering, the library refreshes and the toast says it was synced.
+
+**Tests:** new `cloud-function/v42.test.js`; `v4.test.js` adjusted for the extra libcap usage row. All 7 test files pass (run `cloud-function/test.js` without `LLM_API_KEY` exported in the shell, it reads `process.env`).
+
 ## v4.1 polish — 2026-10-09
 
 Still v4.1 (same version name). A refinement pass: no new design language, and no features removed. Cloudflare deployment `7d104a88-1116-4c69-a858-375ded02409d`, git tag `v4.1`. Rollback target: `caccbb28` (tag `v4.1-backup`). Handover §18.7.

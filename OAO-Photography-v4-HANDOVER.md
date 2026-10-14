@@ -1,5 +1,6 @@
 # OAO Photography Club (OAO 摄影社) website: v4 handover
 
+> **v4.2 (2026-10-14) is on the PREVIEW only:** <https://v42.oao-photography.pages.dev> (Pages branch `v42`, deployment `49667edf`). Delivery → 活动素材库 auto-sync. Production is still v4.1. See **§19**.
 > **v4.1 (polish) LIVE in production (2026-10-09):** CAS 时间 on tasks, 邀请拍摄 kept off the public site, delivery opens on 已结束, admin-only AI 分组 and a UI consistency pass. Cloudflare deployment **`7d104a88-1116-4c69-a858-375ded02409d`**, git `main` / tag `v4.1` (moved to the polish commit). **Rollback:** the pre-polish v4.1 deployment `caccbb28-9462-42eb-8339-7f0e1f58dee5` (git tag `v4.1-backup`, files in `/workspace/backups/v4.1-2026-10-09/deploy`), see §18.7. Older rollback: v4 deployment `522b752c-166e-4583-a01b-c6d5455c3f8e` (§18.1). The v4.1 preview stays at <https://v41.oao-photography.pages.dev>. See **§18**. The v4 notes below describe the base that v4.1 extends.
 > **Version:** v4 (calendar + 报名/交付 workflow, hidden admin dashboard, more AI under a hard ≤ ¥20/month cap, automatic dark mode, fully transparent glass). **Status (2026-10-09):** v4 went live as Cloudflare deployment `522b752c` (git tag `v4`) and was superseded the same day by **v4.1** (deployment `caccbb28`, git `main` / tag `v4.1`). The v4 preview remains at <https://v4.oao-photography.pages.dev> (Pages branch `v4`). **Rollback:** v3 deployment `0d0d5be2` (git tag `v3`); see §17.8. See **§17** for everything v4: new tables, secrets, admin flow, AI budget, promote and rollback.
 > **Live URL (v4 since 2026-10-09):** <https://oao-photography.pages.dev>. The whole site is password-locked; ask the owner for the password.
@@ -1037,3 +1038,42 @@ Still called **v4.1**. This is a refinement pass on the same design language (Ap
 
 **Screenshots.** `/workspace/v41p-shots/` (not in git) covers 1280/390 × light/dark: hero, tab bar on 邀请拍摄 (plus `.on-dark` crops), task modal, admin editor, timeline, calendar and login modal. It also has a reduce-transparency set at 390.
 
+
+---
+
+## 19. v4.2 (PREVIEW, 2026-10-14): deliveries appear in 活动素材库
+
+**Status:** deployed to the preview branch `v42` only → <https://v42.oao-photography.pages.dev> (deployment `49667edf`). **Not promoted to production.** Git branch `v4.2`.
+
+### 19.1 What it does
+- `POST /api/applications/:id/deliver` (deliver and re-deliver), after saving the delivery, calls `syncLibrary()`:
+  - finds the 照片素材 row whose `来源申请ID` = the application id (Feishu search), then updates it, or creates one;
+  - fields: 活动 = `libraryTitle(任务名称, 日期)` → `中国文化周Day1 10.13` (month unpadded, day padded); 网盘链接; 提取码; 分类 = `素材`; 说明 = caption; 来源申请ID.
+  - caption: `aiCall("libcap", …, 120)`, one or two lines ≤ 30 字, no names/学号/tags. On any AI refusal or error the raw description (newlines collapsed, ≤120 chars) is used.
+  - best effort: if the sync fails the delivery still succeeds; the response carries `library: {ok, updated, title, caption, ai}`.
+- Admin `PUT /api/admin/applications/:id`: 已退回 / 已取消 → `unsyncLibrary()` deletes the card(s); 已交付 / 已验收 → re-creates it if missing, without AI (uses the stored description). Member cancel also unsyncs.
+- Frontend: `renderLibrary` shows newest first (first 12); after a delivery `OAO.reload()` refreshes the library and the toast says 已同步到活动素材库. The card markup is unchanged.
+- Rows added by hand (no 来源申请ID) are never touched.
+
+### 19.2 Schema (additive, already applied to the live Base)
+- 照片素材: new text field **`来源申请ID`**, 分类 gets option **`素材`** (`schema.py`, `setup_tables.py`, `verify.py` → schema OK). `F.photo.sourceApp` in `app.js` and `cloud-function/index.js`. The v4.1 production build ignores the field.
+
+### 19.3 AI
+| Feature | key | max_tokens | per day | cooldown |
+|---|---|---|---|---|
+| 素材库文案 (delivery → library caption) | `libcap` | 120 | 80 | none (`noCooldown`) so back-to-back deliveries are not refused |
+Measured on the preview: one call ≈ ¥0.001. Same monthly guard (stop at ¥18, cap ¥20).
+
+### 19.4 Preview secrets
+Preview env already had all 19 secrets. On 2026-10-14 `SITE_PASSWORD`, `MEMBER_PASSCODE`, `ADMIN_PASSCODE`, `FEISHU_APP_SECRET`, `LLM_API_KEY` were re-put from the owner's values (piped) and `ALLOWED_ORIGIN=https://v42.oao-photography.pages.dev`. Preview `MEMBER_TOKEN`/`ADMIN_TOKEN` unchanged (still differ from production).
+
+### 19.5 Checks
+- 7 test files pass (`cloud-function/test.js`, `v4.test.js`, `v42.test.js`, `frontend.test.js`, `integration.test.js`, `design.test.js`, `events.test.js`). Note: `cloud-function/test.js` reads `process.env`, so unset `LLM_API_KEY` in your shell before running it.
+- Live on v42: a 【测试】 task (已结束, 2026-10-13) + admin-assigned application (TEST9999) → deliver 200, card `【测试】中国文化周Day1 10.13` with AI caption; re-deliver updated the same card (1 row); no name/学号 in `/api/photos`; 退回 → card removed. All test records deleted via the Feishu API (拍摄任务 29 / 报名与交付 40 / 照片素材 4, same as before). One libcap usage row remains in AI用量 (real spend record).
+- Screenshots: `/workspace/v42-shots/library-card-{1280,390}.png`, `library-section-{1280,390}.png` (not in git).
+
+### 19.6 Promote (only after owner approval)
+```bash
+cd /workspace/oao-deploy-v42 && rm -rf .wrangler && npx wrangler@4 pages deploy . --project-name oao-photography --branch main --commit-dirty=true
+```
+No production secret changes needed. Rollback: production deployment `7d104a88` (v4.1 polish). Existing deliveries made before v4.2 are not back-filled; re-deliver or add them by hand.

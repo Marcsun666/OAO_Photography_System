@@ -141,11 +141,17 @@
             "sports",
             "stage",
             "collab",
-            "landscape"
+            "landscape",
+            "素材"
           ]
         },
         {
           "name": "说明",
+          "type": "text",
+          "primary": false
+        },
+        {
+          "name": "来源申请ID",
           "type": "text",
           "primary": false
         }
